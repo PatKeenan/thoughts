@@ -2,7 +2,8 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { getStore } from "@/lib/store";
 import { slugify, uniqueSlug } from "@/lib/slug";
-import type { DocNode, Post, PostStatus } from "@/lib/types";
+import { validateLook } from "@/lib/look";
+import type { DocNode, Look, Post, PostStatus } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -52,6 +53,14 @@ export async function PATCH(req: Request, { params }: Ctx) {
       return bad("content must be a doc node");
     }
   }
+  let look: Look | null | undefined;
+  if (body.look !== undefined) {
+    if (body.look === null) look = null;
+    else {
+      look = validateLook(body.look);
+      if (!look) return bad("look is not a valid look");
+    }
+  }
   let status: PostStatus | undefined;
   if (body.status !== undefined) {
     if (typeof body.status !== "string" || !STATUSES.includes(body.status as PostStatus)) {
@@ -72,6 +81,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (body.title !== undefined) patch.title = body.title as string;
   if (body.excerpt !== undefined) patch.excerpt = body.excerpt as string;
   if (body.content !== undefined) patch.content = body.content as DocNode;
+  if (look !== undefined) patch.look = look;
   let slug = body.slug !== undefined ? slugify(body.slug as string) : existing.slug;
 
   const nextStatus = status ?? existing.status;
@@ -108,6 +118,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   const post = await store.updatePost(id, patch);
   if (!post) return Response.json({ error: "Not found" }, { status: 404 });
+  // A look change on a live post is covered here too: its code theme changes how the post renders.
   if (isLive(existing) || isLive(post)) revalidatePublic();
   return Response.json({ post });
 }

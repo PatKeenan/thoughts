@@ -60,3 +60,56 @@
   font-size: 0.8rem;
   color: var(--ink-3);
 }
+
+.body {
+  position: relative;
+}
+
+/* Small tag on the figure's top-right corner (the motion tag sits top-left). */
+.offTag {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.1rem 0.35rem;
+  background: var(--paper);
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.action {
+  white-space: nowrap;
+}
+
+.action:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.on {
+  color: var(--ink);
+}
+
+.moreRow {
+  margin-top: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.moreRow .action:first-child {
+  padding-left: 0;
+}
+
+.hint {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--ink-2);
+}
+
+.moreRow {
+  flex-wrap: wrap;
+}

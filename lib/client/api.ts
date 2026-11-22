@@ -2,6 +2,7 @@ import type {
   BuddyMode,
   BuddyResult,
   FactCheckResult,
+  Look,
   Post,
   PostSummary,
   Settings,
@@ -39,7 +40,7 @@ async function request<T>(
 }
 
 export type PostPatch = Partial<
-  Pick<Post, "title" | "slug" | "excerpt" | "content" | "status" | "publishAt">
+  Pick<Post, "title" | "slug" | "excerpt" | "content" | "status" | "publishAt" | "look">
 >;
 
 export const api = {
@@ -80,6 +81,18 @@ export const api = {
   },
   factcheck(body: { claim: string; context: string; title: string }): Promise<FactCheckResult> {
     return request<FactCheckResult>("/api/ai/factcheck", { method: "POST", body });
+  },
+  async extractLook(body: {
+    source:
+      | { kind: "image"; url: string; prompt?: string }
+      | { kind: "motion"; code: string }
+      | { kind: "text"; description: string };
+    post?: { title: string; text: string };
+  }): Promise<Look> {
+    return (await request<{ look: Look }>("/api/ai/look", { method: "POST", body })).look;
+  },
+  async restyleMotion(code: string): Promise<string> {
+    return (await request<{ code: string }>("/api/ai/restyle", { method: "POST", body: { code } })).code;
   },
   meta(body: { title: string; text: string }): Promise<{ titles: string[]; excerpt: string; slug: string }> {
     return request("/api/ai/meta", { method: "POST", body });

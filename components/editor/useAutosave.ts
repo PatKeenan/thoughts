@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
-import type { DocNode, Post } from "@/lib/types";
+import type { DocNode, Look, Post } from "@/lib/types";
 
 export type SaveState = "saved" | "saving" | "offline" | "error";
 
 export interface DraftSnapshot {
   title: string;
   content: DocNode;
+  /** Present only when the look changed and hasn't been saved yet. */
+  look?: Look | null;
 }
 
 interface LocalDraft extends DraftSnapshot {
@@ -77,7 +79,11 @@ export function useAutosave(id: string, onSaved: (post: Post) => void) {
     setState("saving");
     const run = (async () => {
       try {
-        const post = await api.patchPost(id, { title: snap.title, content: snap.content });
+        const post = await api.patchPost(id, {
+          title: snap.title,
+          content: snap.content,
+          ...("look" in snap ? { look: snap.look ?? null } : {}),
+        });
         if (pending.current === snap) {
           pending.current = null;
           markSynced(id);
@@ -98,7 +104,10 @@ export function useAutosave(id: string, onSaved: (post: Post) => void) {
   }, [id]);
 
   const schedule = useCallback(
-    (snap: DraftSnapshot) => {
+    (input: DraftSnapshot) => {
+      // An unsaved look rides along with later snapshots until a save succeeds.
+      const prev = pending.current;
+      const snap = !("look" in input) && prev && "look" in prev ? { ...input, look: prev.look } : input;
       pending.current = snap;
       writeLocal(id, snap, false);
       if (timer.current) clearTimeout(timer.current);

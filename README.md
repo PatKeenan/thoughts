@@ -9,6 +9,7 @@ A personal blog with a phone-first writing app you add to your Home Screen.
   - `/motion` — **Animation**: the AI writes a Remotion composition, previewed live in a sandboxed frame, rendered on Add inline as a **Loop** (silent autoplaying MP4), **GIF** or **Video**. **Video clip**: a short clip from an AI video model.
   - `/github` — search your repos, browse files, pick lines as a snippet, attach files as context for the AI, or insert a repo card.
   - `/fact` or select text and tap **Check** — a verdict with sources; replace the claim with corrected wording or link a source.
+- **Look** — each post has one visual look (palette, type feel, illustration style, motion pace, code theme). It is set from the first image or animation you add, from "Use as the look" on any block, or by describing one. Every later image, animation and clip follows it; code blocks take its code theme. Blocks made before the look (or before you changed it) are tagged off-look and can be restyled one at a time or all together — never automatically. Looks can be saved, reused, and one set as the site default.
 - **Buddy** — line-edits (Polish) and structural notes (Structure) that follow your voice: it learns from your published posts and the voice notes in Settings. You accept or skip each change.
 - **Publish** — now or scheduled. Scheduled posts go live on their own at the set time (within a minute).
 
@@ -42,6 +43,7 @@ All AI goes through OpenRouter, one model per job, set in `lib/models.ts` and ov
 | images | `google/gemini-3.1-flash-image` |
 | animations (Remotion code) | `anthropic/claude-sonnet-5.5` |
 | video clips | `google/veo-3.1-fast` |
+| reading a look from an image/animation | `anthropic/claude-sonnet-5.5` |
 | fact-check (web search) | `anthropic/claude-sonnet-5.5:online` |
 
 ## Animations

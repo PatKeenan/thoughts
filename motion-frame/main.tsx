@@ -1,12 +1,14 @@
 // Motion preview frame. Built by scripts/build-motion-frame.mjs into
 // public/motion-frame.{html,js}; embedded by components/motion/MotionPreview
 // in <iframe sandbox="allow-scripts"> (opaque origin, strict CSP, no network).
-// Protocol: parent → {type:"code", code}; frame → {type:"ready"} | {type:"ok", config} | {type:"error", message}.
+// Protocol: parent → {type:"code", code, theme?} (theme is re-validated here); frame → {type:"ready"} | {type:"ok", config} | {type:"error", message}.
 import { Player, type PlayerRef } from "@remotion/player";
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { evaluateMotion, type EvaluatedMotion } from "../remotion/evaluate";
-import type { MotionConfig } from "../lib/types";
+import { sanitizeTheme } from "../remotion/theme";
+import { DEFAULT_MOTION_THEME } from "../lib/look";
+import type { MotionConfig, MotionTheme } from "../lib/types";
 
 type Out = { type: "ready" } | { type: "ok"; config: MotionConfig } | { type: "error"; message: string };
 
@@ -108,6 +110,7 @@ function Scrub({ player, entry }: { player: PlayerRef | null; entry: Entry }) {
 
 function App() {
   const [shown, setShown] = useState<Entry | null>(null);
+  const [theme, setTheme] = useState<MotionTheme>(DEFAULT_MOTION_THEME);
   const [player, setPlayer] = useState<PlayerRef | null>(null);
   const good = useRef<Entry | null>(null); // last entry that played without error
   const shownRef = useRef<Entry | null>(null);
@@ -118,10 +121,11 @@ function App() {
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       if (e.source !== window.parent) return;
-      const d = e.data as { type?: unknown; code?: unknown } | null;
+      const d = e.data as { type?: unknown; code?: unknown; theme?: unknown } | null;
       if (!d || d.type !== "code" || typeof d.code !== "string") return;
       try {
         const ev = evaluateMotion(d.code);
+        setTheme(sanitizeTheme(d.theme)); // theme-only change: same Component, so no remount
         if (shownRef.current?.Component === ev.Component) {
           post({ type: "ok", config: ev.config });
           return;
@@ -162,6 +166,7 @@ function App() {
           key={shown.id}
           ref={setPlayer}
           component={shown.Component}
+          inputProps={{ theme }}
           durationInFrames={config.durationInFrames}
           fps={config.fps}
           compositionWidth={config.width}

@@ -1,9 +1,12 @@
 // Thin OpenRouter client: chat() for one-shot replies, chatStream() for plain-text deltas.
 import { modelFor, type Job } from "@/lib/models";
 
+export type ORContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
 export interface ORMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  /** Plain text, or content parts (text first, then images) for vision input. */
+  content: string | ORContentPart[];
 }
 
 export interface ORRequest {

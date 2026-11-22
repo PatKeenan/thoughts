@@ -8,13 +8,13 @@ import React from "react";
 import * as ReactNS from "react";
 import * as JsxRuntime from "react/jsx-runtime";
 import * as Remotion from "remotion";
-import type { MotionConfig } from "../lib/types";
+import type { MotionConfig, MotionTheme } from "../lib/types";
 import { compileMotion, extractConfig, MotionCodeError } from "./check";
 
 export { MotionCodeError } from "./check";
 
 export interface EvaluatedMotion {
-  Component: ComponentType;
+  Component: ComponentType<{ theme: MotionTheme }>;
   config: MotionConfig;
 }
 
@@ -53,7 +53,7 @@ export function evaluateMotion(code: string): EvaluatedMotion {
     throw new MotionCodeError("The module must `export default` a React component.");
   }
 
-  const result: EvaluatedMotion = { Component: Component as ComponentType, config };
+  const result: EvaluatedMotion = { Component: Component as ComponentType<{ theme: MotionTheme }>, config };
   cache.set(code, result);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
   return result;

@@ -1,13 +1,44 @@
 import { createHighlighter, type Highlighter } from "shiki";
+import { CODE_THEMES, DEFAULT_CODE_THEME } from "@/lib/look";
 
-// Dark theme: the code block is dark (var(--code-bg)) in both colour schemes.
-const THEME = "vitesse-dark";
+// The default theme is dark; a post's look may pick any theme in CODE_THEMES (light ones too).
+// Themes are loaded lazily, one at a time, and cached on the shared highlighter.
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
 function getHighlighter(): Promise<Highlighter> {
-  highlighterPromise ??= createHighlighter({ themes: [THEME], langs: [] });
+  highlighterPromise ??= createHighlighter({ themes: [DEFAULT_CODE_THEME], langs: [] });
   return highlighterPromise;
+}
+
+/** Unknown or missing theme names fall back to the default. */
+export function resolveTheme(theme?: string | null): string {
+  return theme && (CODE_THEMES as readonly string[]).includes(theme) ? theme : DEFAULT_CODE_THEME;
+}
+
+async function loadedTheme(theme?: string | null): Promise<{ h: Highlighter; name: string }> {
+  const name = resolveTheme(theme);
+  const h = await getHighlighter();
+  if (!h.getLoadedThemes().includes(name)) await h.loadTheme(name as never);
+  return { h, name };
+}
+
+export interface ThemeColors {
+  /** Theme background, e.g. "#121212". */
+  bg: string;
+  /** Theme foreground (plain text colour). */
+  fg: string;
+}
+
+/** The theme's own background and foreground (the default theme's on unknown names or failure). */
+export async function themeColors(theme?: string | null): Promise<ThemeColors> {
+  try {
+    const { h, name } = await loadedTheme(theme);
+    const t = h.getTheme(name);
+    return { bg: t.bg, fg: t.fg };
+  } catch {
+    return { bg: "#121212", fg: "#dbd7ca" };
+  }
 }
 
 export function escapeHtml(s: string): string {
@@ -28,15 +59,25 @@ function plain(code: string): string {
  * Unknown languages, and any failure, fall back to plain escaped text.
  * Token styles are inline colours only; the pre has no background of its own.
  */
-export async function highlight(code: string, lang: string): Promise<string> {
+export async function highlight(code: string, lang: string, theme?: string | null): Promise<string> {
+  return (await highlightThemed(code, lang, theme)).html;
+}
+
+/** Like `highlight`, plus the theme's background and foreground for the surrounding figure. */
+export async function highlightThemed(
+  code: string,
+  lang: string,
+  theme?: string | null,
+): Promise<{ html: string } & ThemeColors> {
+  const colors = await themeColors(theme);
   const id = (lang || "text").trim().toLowerCase();
-  if (id === "text" || id === "plaintext" || id === "txt" || id === "") return plain(code);
+  if (id === "text" || id === "plaintext" || id === "txt" || id === "") return { html: plain(code), ...colors };
   try {
-    const h = await getHighlighter();
+    const { h, name } = await loadedTheme(theme);
     if (!h.getLoadedLanguages().includes(id)) await h.loadLanguage(id as never);
-    return h.codeToHtml(code, {
+    const html = h.codeToHtml(code, {
       lang: id,
-      theme: THEME,
+      theme: name,
       transformers: [
         {
           pre(node) {
@@ -46,7 +87,8 @@ export async function highlight(code: string, lang: string): Promise<string> {
         },
       ],
     });
+    return { html, ...colors };
   } catch {
-    return plain(code);
+    return { html: plain(code), ...colors };
   }
 }

@@ -2,13 +2,14 @@
 
 // Image and motion modes of the studio: preview stages, pickers, alt/caption fields.
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Aspect, MotionOutput } from "@/lib/types";
 import {
   ASPECTS,
   CLIP_ASPECTS,
   CLIP_SECONDS,
   OUTPUTS,
+  activeLook,
   currentVersion,
   isBusy,
   type MotionMode,
@@ -16,6 +17,8 @@ import {
 } from "@/lib/client/studio";
 import MotionPreview from "@/components/motion/MotionPreview";
 import { CodeBody } from "@/components/editor/CodeView";
+import { Swatches } from "@/components/editor/LookChip";
+import { motionThemeFromLook } from "@/lib/look";
 import { HandEditor, ProgressBar, Segmented, Stepper, type Part } from "./parts";
 import styles from "./Studio.module.css";
 import m from "./Media.module.css";
@@ -59,6 +62,7 @@ export function MediaBody({ s, dispatch, altRef, elapsed }: Part & { altRef: Rea
       {clip && <ClipStage s={s} dispatch={dispatch} />}
 
       <section className={m.controls}>
+        <LookRow s={s} dispatch={dispatch} />
         {s.mode === "image" && (
           <Segmented<Aspect>
             label="Aspect"
@@ -142,6 +146,35 @@ export function MediaBody({ s, dispatch, altRef, elapsed }: Part & { altRef: Rea
   );
 }
 
+// ---- look ----------------------------------------------------------------------
+
+/** "Use post look" switch with the look's name and swatches. Hidden when the post has no look. */
+function LookRow({ s, dispatch }: Part) {
+  if (!s.look) return null;
+  const on = s.useLook;
+  return (
+    <div className={m.lookRow}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        className={m.switch}
+        disabled={isBusy(s)}
+        onClick={() => dispatch({ type: "useLook", on: !on })}
+      >
+        <span className={`${m.track} ${on ? m.trackOn : ""}`} aria-hidden="true">
+          <span className={m.knob} />
+        </span>
+        <span className={m.switchLabel}>Use post look</span>
+      </button>
+      <span className={`${m.lookName} ${on ? "" : m.lookOff}`}>
+        <Swatches look={s.look} />
+        <span className={m.lookText}>{s.look.name}</span>
+      </span>
+    </div>
+  );
+}
+
 // ---- image ---------------------------------------------------------------------
 
 function ImageStage({ s, dispatch, elapsed }: Part & { elapsed: number }) {
@@ -186,6 +219,8 @@ function AnimationStage({ s, dispatch }: Part) {
   const cur = currentVersion(s);
   const code = cur?.kind === "motion" ? cur.data.code : null;
   const writing = s.request?.kind === "motion";
+  const look = activeLook(s);
+  const theme = useMemo(() => motionThemeFromLook(look), [look]);
   const onStatus = useCallback(
     (st: PreviewStatus) => {
       if (code !== null) dispatch({ type: "previewStatus", code, status: st });
@@ -224,7 +259,7 @@ function AnimationStage({ s, dispatch }: Part) {
       )}
       <div className={writing ? m.dim : undefined}>
         {/* Only complete versions reach the player; the streaming reply never does. */}
-        <MotionPreview code={code} onStatus={onStatus} />
+        <MotionPreview code={code} theme={theme} onStatus={onStatus} />
       </div>
       <div className={styles.previewActions}>
         <div className={m.actionGroup}>

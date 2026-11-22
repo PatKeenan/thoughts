@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { stampOf, validateLook } from "@/lib/look";
 import { MAX_IMAGE_BYTES, decodeBase64, putMedia, readCapped, referenceUrl } from "@/lib/media";
 import {
   HttpError,
@@ -11,23 +12,28 @@ import {
   type ORMessage,
 } from "@/lib/openrouter";
 import { imagePromptSystem, imagePromptUser, truncate } from "@/lib/prompts";
-import type { Aspect, ChatMessage, ImageData } from "@/lib/types";
+import type { Aspect, ChatMessage, ImageData, Look } from "@/lib/types";
 
 export const maxDuration = 120;
 
 const ASPECTS: Aspect[] = ["16:9", "1:1", "4:5", "3:2"];
 
-function mockSvg(prompt: string, aspect: Aspect): string {
+function mockSvg(prompt: string, aspect: Aspect, look: Look | null): string {
+  // With a look, draw with its palette so the look is visible in a browser test.
+  const bg = look?.palette.bg ?? "#f5efe4";
+  const ink = look?.palette.ink ?? "#1b1712";
+  const accent = look?.palette.accent ?? "#d63f1c";
+  const muted = look?.palette.muted ?? "#d6ccb9";
   const [aw, ah] = aspect.split(":").map(Number);
   const w = 1200;
   const h = Math.round((w * ah) / aw);
   const label = prompt.trim().split(/\s+/).slice(0, 6).join(" ").replace(/[&<>"]/g, "");
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">` +
-    `<rect width="${w}" height="${h}" fill="#f5efe4"/>` +
-    `<rect x="40" y="40" width="${w - 80}" height="${h - 80}" fill="none" stroke="#d6ccb9" stroke-width="2"/>` +
-    `<circle cx="${w / 2}" cy="${h / 2 - 20}" r="${Math.round(Math.min(w, h) / 7)}" fill="#d63f1c"/>` +
-    `<text x="${w / 2}" y="${h - 90}" text-anchor="middle" font-family="Georgia, serif" font-size="44" fill="#1b1712">${label}</text>` +
+    `<rect width="${w}" height="${h}" fill="${bg}"/>` +
+    `<rect x="40" y="40" width="${w - 80}" height="${h - 80}" fill="none" stroke="${muted}" stroke-width="2"/>` +
+    `<circle cx="${w / 2}" cy="${h / 2 - 20}" r="${Math.round(Math.min(w, h) / 7)}" fill="${accent}"/>` +
+    `<text x="${w / 2}" y="${h - 90}" text-anchor="middle" font-family="Georgia, serif" font-size="44" fill="${ink}">${label}</text>` +
     `</svg>`
   );
 }
@@ -61,19 +67,26 @@ export async function POST(request: Request) {
 
     const cur = body.current as Partial<ImageData> | undefined;
     const current = cur && typeof cur.prompt === "string" && cur.prompt.trim() ? { prompt: cur.prompt, url: typeof cur.url === "string" ? cur.url : "" } : undefined;
+    // An invalid look is ignored (treated as none).
+    const look = body.look ? validateLook(body.look) : null;
     const p = body.post as { title?: unknown; text?: unknown } | undefined;
     const post = p ? { title: String(p.title ?? ""), text: String(p.text ?? "") } : undefined;
 
     if (process.env.AI_MOCK === "1") {
       const last = messages[messages.length - 1].content.replace(/\s+/g, " ").slice(0, 200);
-      const { url } = await putMedia(Buffer.from(mockSvg(last, aspect)), "image/svg+xml");
-      const image: ImageData = { url, alt: `Mock illustration: ${last.slice(0, 80)}`, prompt: last, aspect };
+      const { url } = await putMedia(Buffer.from(mockSvg(last, aspect, look)), "image/svg+xml");
+      const image: ImageData = { url, alt: `Mock illustration: ${last.slice(0, 80)}`, prompt: last, aspect, look: stampOf(look) };
       return Response.json({ image, note: `Mock image for: ${last.slice(0, 80)}` });
     }
 
+    // References: the image being refined (if any) and the look's style reference (if any), never the same URL twice.
+    const curRef = current?.url ? await referenceUrl(current.url) : null;
+    let lookRef = look?.referenceUrl ? await referenceUrl(look.referenceUrl) : null;
+    if (lookRef && (lookRef === curRef || look?.referenceUrl === current?.url)) lookRef = null;
+
     // Step 1: conversation -> one complete prompt + alt + note.
     const system: ORMessage = { role: "system", content: imagePromptSystem() };
-    const user: ORMessage = { role: "user", content: imagePromptUser({ aspect, current, post }) };
+    const user = { role: "user" as const, content: imagePromptUser({ aspect, current, post, look, refs: { current: !!curRef, look: !!lookRef } }) };
     const out = await chat({
       job: "fast",
       json: true,
@@ -88,8 +101,15 @@ export async function POST(request: Request) {
     const note = typeof parsed?.note === "string" ? parsed.note.trim() : "Made a new image.";
 
     // Step 2: generate. When refining, pass the current image as a reference (input_references).
-    const ref = current?.url ? await referenceUrl(current.url) : null;
-    const gen = await generateImage({ prompt, aspect, references: ref ? [ref] : undefined, signal: request.signal });
+    const references = [curRef, lookRef].filter((r): r is string => !!r);
+    const gen = await generateImage({
+      prompt: lookRef
+        ? `${prompt}\n\n${curRef ? "Image 1 is the current image being refined; image 2" : "The reference image"} is the style reference: match its style (palette, medium, line, texture, lighting), not its content.`
+        : prompt,
+      aspect,
+      references: references.length ? references : undefined,
+      signal: request.signal,
+    });
     let bytes: Buffer;
     let type = gen.mediaType;
     if (/^https?:\/\//.test(gen.b64)) {
@@ -103,7 +123,7 @@ export async function POST(request: Request) {
     }
     if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new HttpError(502, "The image model returned an unusable image");
     const { url } = await putMedia(bytes, type);
-    const image: ImageData = { url, alt: alt || prompt.slice(0, 140), prompt, aspect };
+    const image: ImageData = { url, alt: alt || prompt.slice(0, 140), prompt, aspect, look: stampOf(look) };
     return Response.json({ image, note });
   } catch (e) {
     return errorResponse(e);

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
-import type { CodeData, GenBlockAttrs } from "@/lib/types";
+import type { CodeData, GenBlockAttrs, Look } from "@/lib/types";
+import { codeThemeOf, motionThemeFromLook } from "@/lib/look";
 import {
   contextLabel,
   currentVersion,
@@ -25,7 +26,7 @@ import {
   type StudioState,
 } from "@/lib/client/studio";
 import { extractArtifact } from "@/lib/studio/parse";
-import { CodeBody } from "@/components/editor/CodeView";
+import { CodeBody, useCodeThemeVars } from "@/components/editor/CodeView";
 import RepoView from "@/components/editor/RepoView";
 import { LANGUAGES, normalizeLang } from "@/components/editor/highlight";
 import { useCoarsePointer, useViewport } from "@/components/editor/useViewport";
@@ -50,10 +51,12 @@ interface StudioProps {
   onClose(): void;
   onCommit(result: StudioCommit): void;
   getPostContext(): { title: string; text: string };
+  /** the post's effective look (null = none) */
+  look: Look | null;
 }
 
-function init(open: StudioOpen): StudioState {
-  const s = initStudio({ mode: open.mode, existing: open.existing });
+function init({ open, look }: { open: StudioOpen; look: Look | null }): StudioState {
+  const s = initStudio({ mode: open.mode, existing: open.existing, look });
   return open.regenerate ? studioReducer(s, { type: "regenerate" }) : s;
 }
 
@@ -78,8 +81,8 @@ const DISCARD: Record<StudioMode, string> = {
   motion: "Discard this motion graphic?",
 };
 
-export default function Studio({ open, onClose, onCommit, getPostContext }: StudioProps) {
-  const [s, dispatch] = useReducer(studioReducer, open, init);
+export default function Studio({ open, onClose, onCommit, getPostContext, look }: StudioProps) {
+  const [s, dispatch] = useReducer(studioReducer, { open, look }, init);
   const vp = useViewport();
   const scrollRef = useRef<HTMLDivElement>(null);
   const altRef = useRef<HTMLTextAreaElement>(null);
@@ -99,6 +102,11 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
     };
   }, []);
 
+  // The post's look can change while the studio is open (e.g. auto-capture finished).
+  useEffect(() => {
+    dispatch({ type: "look", look });
+  }, [look]);
+
   // Run the in-flight request (one effect per request object). Unmount aborts it.
   const req = s.request;
   useEffect(() => {
@@ -110,14 +118,14 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
     };
     if (req.kind === "image") {
       generateImage(
-        { messages: req.messages, current: req.image, aspect: req.aspect ?? "16:9", post: getPostContext() },
+        { messages: req.messages, current: req.image, aspect: req.aspect ?? "16:9", post: getPostContext(), look: req.look },
         ctrl.signal,
       )
         .then((r) => dispatch({ type: "imageDone", id: req.id, image: r.image, note: r.note }))
         .catch(fail);
     } else if (req.kind === "clip") {
       generateClip(
-        { prompt: req.prompt ?? "", aspect: req.aspect ?? "16:9", seconds: req.seconds ?? 6 },
+        { prompt: req.prompt ?? "", aspect: req.aspect ?? "16:9", seconds: req.seconds ?? 6, look: req.look },
         (ev) => {
           if (ev.type === "progress") dispatch({ type: "progress", id: req.id, label: ev.label, progress: ev.progress });
         },
@@ -133,6 +141,7 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
           current: req.kind === "code" ? req.current : req.code !== undefined ? { code: req.code } : undefined,
           context: req.kind === "code" && req.context.length ? { files: req.context } : undefined,
           post: getPostContext(),
+          ...(req.kind === "motion" ? { look: req.look } : {}),
         },
         { signal: ctrl.signal, onText: (text) => dispatch({ type: "stream", id: req.id, text }) },
       )
@@ -148,7 +157,7 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
     if (!job) return;
     const ctrl = new AbortController();
     renderMotion(
-      { code: job.code, output: job.output },
+      { code: job.code, output: job.output, ...(job.look ? { theme: motionThemeFromLook(job.look) } : {}) },
       (ev) => {
         if (ev.type === "progress") dispatch({ type: "renderProgress", id: job.id, label: ev.label, progress: ev.progress });
       },
@@ -260,6 +269,9 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
 function Preview({ s, dispatch }: Part) {
   const cur = currentVersion(s);
   const live = streamingArtifact(s);
+  // Code follows the look's code theme (not affected by the "Use post look" switch).
+  const codeTheme = s.look ? codeThemeOf(s.look) : undefined;
+  const themeVars = useCodeThemeVars(codeTheme);
 
   if (cur?.kind === "repo") {
     return (
@@ -281,7 +293,7 @@ function Preview({ s, dispatch }: Part) {
           <span className={styles.filename}>{live.filename || (cur?.kind === "code" && cur.data.filename) || "snippet"}</span>
           <span className={styles.writing}>Writing&hellip;</span>
         </div>
-        <div className={styles.codeFrame}>
+        <div className={styles.codeFrame} style={themeVars}>
           <CodeBody code={live.code} language={live.language} plain />
         </div>
       </section>
@@ -336,8 +348,8 @@ function Preview({ s, dispatch }: Part) {
       {s.handEdit ? (
         <HandEditor code={data.code} dispatch={dispatch} />
       ) : (
-        <div className={styles.codeFrame}>
-          <CodeBody code={data.code} language={data.language} />
+        <div className={styles.codeFrame} style={themeVars}>
+          <CodeBody code={data.code} language={data.language} theme={codeTheme} />
         </div>
       )}
       {data.source && (

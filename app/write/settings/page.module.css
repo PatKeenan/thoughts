@@ -129,3 +129,27 @@
   padding-top: 0.5rem;
   border-top: 1px solid var(--rule);
 }
+.lookRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  min-height: var(--tap);
+  padding: 0 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.lookName {
+  font-family: var(--font-body);
+  font-size: 1rem;
+}
+.dots {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-right: auto;
+}
+.dot {
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--ink-3);
+}

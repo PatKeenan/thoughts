@@ -4,7 +4,8 @@
 // public/motion-frame.html, loaded in <iframe sandbox="allow-scripts">: an
 // opaque origin with a no-network CSP, so it can never touch the session.
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import type { MotionConfig } from "@/lib/types";
+import { DEFAULT_MOTION_THEME } from "@/lib/look";
+import type { MotionConfig, MotionTheme } from "@/lib/types";
 import styles from "./MotionPreview.module.css";
 
 export type MotionStatus = { ok: true; config: MotionConfig } | { ok: false; message: string };
@@ -19,14 +20,17 @@ const DEBOUNCE_MS = 300;
 
 export default function MotionPreview({
   code,
+  theme = DEFAULT_MOTION_THEME,
   onStatus,
 }: {
   code: string;
+  theme?: MotionTheme;
   onStatus?(s: MotionStatus): void;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const ready = useRef(false);
   const latest = useRef(code); // newest code, queued while the frame loads
+  const latestTheme = useRef(theme);
   const posted = useRef<string | null>(null);
   const onStatusRef = useRef(onStatus);
   const [status, setStatus] = useState<MotionStatus | null>(null);
@@ -36,19 +40,24 @@ export default function MotionPreview({
     onStatusRef.current = onStatus;
   }, [onStatus]);
 
+  const themeKey = JSON.stringify(theme); // callers may pass a fresh object each render
+
   const flush = useCallback(() => {
     const win = frameRef.current?.contentWindow;
     const next = latest.current;
-    if (!ready.current || !win || !next.trim() || next === posted.current) return;
-    posted.current = next;
-    win.postMessage({ type: "code", code: next }, "*"); // opaque origin: "*" is the only target
+    const key = `${JSON.stringify(latestTheme.current)}\n${next}`;
+    if (!ready.current || !win || !next.trim() || key === posted.current) return;
+    posted.current = key;
+    // The frame re-validates the theme; a theme-only change does not re-evaluate the code there.
+    win.postMessage({ type: "code", code: next, theme: latestTheme.current }, "*"); // opaque origin: "*" is the only target
   }, []);
 
   useEffect(() => {
     latest.current = code;
+    latestTheme.current = theme;
     const t = setTimeout(flush, DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [code, flush]);
+  }, [code, themeKey, theme, flush]);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {

@@ -102,6 +102,27 @@ export function patchGenBlockData(
   return true;
 }
 
+/**
+ * Replace the data (and optionally history) of the genBlock with this id, wherever it is now.
+ * Unlike patchGenBlockData this is undoable (restyles are edits the author asked for).
+ * No-op (false) if the block is gone, the editor is destroyed, or `guard` rejects its current data.
+ */
+export function replaceGenBlock(
+  editor: Editor,
+  id: string,
+  next: { data: Record<string, unknown>; history?: GenBlockAttrs["history"] },
+  guard?: (data: Record<string, unknown>) => boolean,
+): boolean {
+  if (editor.isDestroyed || !id) return false;
+  const found = findGenBlock(editor.state.doc, id);
+  if (!found) return false;
+  const data = (found.node.attrs.data ?? {}) as Record<string, unknown>;
+  if (guard && !guard(data)) return false;
+  const attrs = { ...found.node.attrs, data: next.data, ...(next.history ? { history: next.history } : {}) };
+  editor.view.dispatch(editor.state.tr.setNodeMarkup(found.pos, undefined, attrs));
+  return true;
+}
+
 export function scrollToBlock(editor: Editor, pos: number) {
   const dom = editor.view.nodeDOM(pos);
   if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: "smooth" });

@@ -1,5 +1,8 @@
 // All system prompts live here so they are easy to tune.
-import type { BuddyMode, BuddyResult, BuddySuggestion, CodeData, FactCheckResult, FactSource, Verdict } from "@/lib/types";
+import { CODE_THEMES, lookToPrompt, usesTheme, validateLook } from "@/lib/look";
+import { parseJsonObject } from "@/lib/openrouter";
+import { extractArtifact } from "@/lib/studio/parse";
+import type { BuddyMode, Look, BuddyResult, BuddySuggestion, CodeData, FactCheckResult, FactSource, Verdict } from "@/lib/types";
 
 // ---- Studio (code snippets) -------------------------------------------------
 
@@ -217,12 +220,19 @@ CODE CONTRACT (the module is compiled and run in a sandbox; break it and it fail
 - Imports ONLY from "react" and "remotion". No other packages, no relative imports.
 - It must have exactly these exports:
   export const config = { durationInFrames: 150, fps: 30, width: 1280, height: 720 };
-  export default function Motion() { ... }
+  export default function Motion({ theme }: { theme: Theme }) { ... }
   config is a plain object literal of numbers. Defaults: 1280x720, 30 fps, 4 to 8 seconds. fps 15-60, at most 20 seconds, width and height even numbers between 240 and 1920. Use a different size only when asked (for example 1080x1080 for square).
+- Declare the theme type in the module: type Theme = { bg: string; ink: string; accent: string; muted: string; extra: string[]; titleFont: string; bodyFont: string; monoFont: string };
 - Inline styles only (style={{...}}). No CSS files, no <style> tags, no classes.
 - No external assets: no images, video, audio, web fonts, network, fetch, <Img>, staticFile, no remote URLs. Draw with divs, SVG and text only.
 - No window, document, setTimeout, setInterval, requestAnimationFrame, Date, Math.random. Use random("seed") from remotion if you need deterministic randomness.
 - No hooks that hold animation state (useState/useEffect for animation). Everything is a pure function of the frame.
+
+THEME (mandatory: the look of the post changes by swapping this prop, so the code must not know the colours)
+- EVERY colour and EVERY font-family comes from the theme prop: theme.bg (page background), theme.ink (text and main shapes), theme.accent (use sparingly, for the one thing to look at), theme.muted (hairlines, quiet panels, secondary shapes), theme.extra (0 to 3 more palette colours, may be empty: always guard with a fallback such as theme.extra[0] ?? theme.accent), theme.titleFont, theme.bodyFont, theme.monoFont (use monoFont for code and numbers).
+- Never write a hex colour (#fff, #1b1712), rgb(), hsl() or a named colour other than "transparent" in the code, and never a literal font stack. Wrap the scene in <AbsoluteFill style={{ backgroundColor: theme.bg }}>.
+- For tints and fades use opacity, or interpolateColors(value, [0, 1], [theme.bg, theme.accent]) from remotion, never a made-up colour.
+- The theme does not decide the feel of the motion or the drawing style. When the request or a LOOK GUIDANCE block describes pace, mood or illustration style, follow it for timing, easing, shape language (flat, hairline, hand-drawn feel, geometric) and density. Flat is the default: no gradients, no drop shadows, no emoji.
 
 ANIMATION
 - Drive ALL animation from useCurrentFrame() with interpolate() and spring(). Always pass { extrapolateLeft: "clamp", extrapolateRight: "clamp" } to interpolate. Use spring({ frame: frame - delay, fps, config: { damping: 200 } }) for smooth, non-bouncy motion. Get fps from useVideoConfig().
@@ -231,28 +241,24 @@ ANIMATION
 - Keep it simple: a few well-placed elements beat a busy scene.
 
 LEGIBILITY
-- The video is shown about 360px wide on a phone, a 1280px frame scaled to roughly 28 percent. So nothing may be smaller than about 4 percent of the frame height (29px at 720 high): body labels 36 to 44px, titles 64 to 96px, code at least 30px. Lines at least 4px thick. Prefer fewer, larger words. High contrast, generous margins (at least 5 percent of the frame).
+- The video is shown about 360px wide on a phone, a 1280px frame scaled to roughly 28 percent. So nothing may be smaller than about 4 percent of the frame height (29px at 720 high): body labels 36 to 44px, titles 64 to 96px, code at least 30px. Lines at least 4px thick. Prefer fewer, larger words. High contrast between theme.ink and theme.bg, generous margins (at least 5 percent of the frame).
 - Text must never overflow or overlap: size boxes for the longest label and set whiteSpace: "nowrap" or explicit widths. Keep labels short.
-
-DEFAULT LOOK (match the blog; change only if the user asks)
-- Background paper #f5efe4, text ink #1b1712, accent #d63f1c (use sparingly, for the one thing to look at), hairline rules #d6ccb9.
-- Titles: Georgia, "Times New Roman", serif. Code and numbers: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace. Other labels: system-ui, -apple-system, "Segoe UI", sans-serif.
-- Flat, like a printed pamphlet: no gradients, no drop shadows, no rounded cards, no emoji.
-- Wrap the scene in <AbsoluteFill style={{ backgroundColor: "#f5efe4" }}>.
 
 SHAPE OF A GOOD ANSWER
 \`\`\`tsx
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 
+type Theme = { bg: string; ink: string; accent: string; muted: string; extra: string[]; titleFont: string; bodyFont: string; monoFont: string };
+
 export const config = { durationInFrames: 150, fps: 30, width: 1280, height: 720 };
 
-export default function Motion() {
+export default function Motion({ theme }: { theme: Theme }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const enter = spring({ frame, fps, config: { damping: 200 } });
   return (
-    <AbsoluteFill style={{ backgroundColor: "#f5efe4", color: "#1b1712", justifyContent: "center", padding: 96 }}>
-      <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: 88, opacity: enter }}>Title</div>
+    <AbsoluteFill style={{ backgroundColor: theme.bg, color: theme.ink, justifyContent: "center", padding: 96 }}>
+      <div style={{ fontFamily: theme.titleFont, fontSize: 88, opacity: enter }}>Title</div>
     </AbsoluteFill>
   );
 }
@@ -261,8 +267,21 @@ export default function Motion() {
 The conversation shows the user's requests and your earlier short notes (without the code). The up-to-date module is given separately under "CURRENT COMPOSITION"; treat that as the truth, not anything you remember.`;
 }
 
-export function motionContext(opts: { post?: { title: string; text: string }; current?: { code: string } }): string {
+/** Look guidance for animations: pace, mood and drawing feel only (colours and fonts come from the theme prop). */
+export function motionLookGuidance(look: Look): string {
+  return `LOOK GUIDANCE (this post has a shared look called "${look.name}"; colours and fonts arrive through the theme prop, so do not hard-code them)
+- Pace: ${look.motion.pace}${look.motion.notes ? `. ${look.motion.notes}` : ""}. (calm = slow eases, long holds; brisk = quicker springs, short holds; snappy = fast, crisp, little overshoot-free settle.)
+- Illustration feel: ${look.illustration}
+${look.mood.length ? `- Mood: ${look.mood.join(", ")}.` : ""}`.trim();
+}
+
+export function motionContext(opts: {
+  post?: { title: string; text: string };
+  current?: { code: string };
+  look?: Look | null;
+}): string {
   const parts: string[] = [motionSystem()];
+  if (opts.look) parts.push(motionLookGuidance(opts.look));
   if (opts.post && (opts.post.title || opts.post.text)) {
     parts.push(
       `ARTICLE CONTEXT (the post this animation belongs in)\nTitle: ${opts.post.title || "(untitled)"}\n${truncate(opts.post.text || "", POST_TEXT_CAP)}`,
@@ -274,12 +293,14 @@ export function motionContext(opts: { post?: { title: string; text: string }; cu
   return parts.join("\n\n");
 }
 
-/** Small valid composition for AI_MOCK=1. */
+/** Small valid contract-v2 composition for AI_MOCK=1 (reads every colour and font from the theme). */
 export const MOCK_MOTION = `import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+
+type Theme = { bg: string; ink: string; accent: string; muted: string; extra: string[]; titleFont: string; bodyFont: string; monoFont: string };
 
 export const config = { durationInFrames: 90, fps: 30, width: 1280, height: 720 };
 
-export default function Motion() {
+export default function Motion({ theme }: { theme: Theme }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -288,17 +309,106 @@ export default function Motion() {
   const bar = interpolate(frame, [20, 60], [0, 1], clamp);
   const out = interpolate(frame, [75, 90], [1, 0], clamp);
   return (
-    <AbsoluteFill style={{ backgroundColor: "#f5efe4", color: "#1b1712", justifyContent: "center", padding: 96, opacity: out }}>
-      <div style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: 96, opacity: enter, transform: \`translateX(\${slide}px)\` }}>
+    <AbsoluteFill style={{ backgroundColor: theme.bg, color: theme.ink, justifyContent: "center", padding: 96, opacity: out }}>
+      <div style={{ fontFamily: theme.titleFont, fontSize: 96, opacity: enter, transform: \`translateX(\${slide}px)\` }}>
         A small idea
       </div>
-      <div style={{ marginTop: 48, height: 24, width: 1088, backgroundColor: "#d6ccb9" }}>
-        <div style={{ height: 24, width: \`\${bar * 100}%\`, backgroundColor: "#d63f1c" }} />
+      <div style={{ marginTop: 48, height: 24, width: 1088, backgroundColor: theme.muted }}>
+        <div style={{ height: 24, width: \`\${bar * 100}%\`, backgroundColor: theme.accent }} />
       </div>
     </AbsoluteFill>
   );
 }
 `;
+
+// ---- Restyle (v1 composition -> v2 theme-driven) ---------------------------------
+
+export function restyleSystem(): string {
+  return `You convert an existing Remotion composition to the theme-driven contract, changing nothing else.
+
+Task: rewrite the module so that every hard-coded colour and font-family comes from a \`theme\` prop, and return the COMPLETE module.
+- The default export becomes: export default function Motion({ theme }: { theme: Theme }) { ... } (keep the name if it already has one). Add this type to the module if missing: type Theme = { bg: string; ink: string; accent: string; muted: string; extra: string[]; titleFont: string; bodyFont: string; monoFont: string };
+- Map each colour to the nearest token by role: page/scene background -> theme.bg; text and main shapes -> theme.ink; the highlighted or emphasised colour -> theme.accent; hairlines, quiet panels, tracks, secondary or faint shapes -> theme.muted; any further distinct colours -> theme.extra[0], theme.extra[1], theme.extra[2] (always with a fallback, for example theme.extra[0] ?? theme.accent). Fonts: serif/display/title stacks -> theme.titleFont; sans/label/body stacks -> theme.bodyFont; monospace stacks -> theme.monoFont.
+- Colours that are tints (rgba, hex with alpha, a mix of two colours) become a theme colour plus opacity, or interpolateColors(...) between theme colours. No hex, rgb(), hsl() or named colours may remain (except "transparent"); no literal font stacks may remain.
+- Change NOTHING else: same layout, sizes, timing, text, structure, imports (still only "react" and "remotion"), same \`config\` export. Do not refactor, rename or "improve".
+- If the module already uses theme, return it unchanged.
+
+Reply with one short sentence, then exactly ONE fenced code block (language tsx) holding the complete module. Nothing after the block.`;
+}
+
+/** Small valid v2 composition for AI_MOCK=1 restyle replies. */
+export const MOCK_RESTYLE = MOCK_MOTION;
+
+// ---- Look extraction -----------------------------------------------------------
+
+export function lookSystem(): string {
+  return `You are an art director extracting a reusable VISUAL STYLE ("look") for one blog post, so that later illustrations and animations for the same post feel like they belong together while showing different things.
+
+Describe STYLE that can transfer to a different subject. Never describe what the picture or animation depicts (no objects, people, scenes, plot, text content); describe how it is made and how it feels.
+
+Return strictly one JSON object, no prose, no markdown fences, with exactly these fields:
+{
+  "name": "<2 to 4 words, a short evocative name for the look, no quotes>",
+  "palette": {
+    "bg": "#rrggbb",
+    "ink": "#rrggbb",
+    "accent": "#rrggbb",
+    "muted": "#rrggbb",
+    "extra": ["#rrggbb"]
+  },
+  "typography": { "title": "serif" | "sans" | "mono", "body": "serif" | "sans" | "mono" },
+  "illustration": "<one or two sentences, under 350 characters, covering: the medium (e.g. flat vector, risograph print, pencil, gouache, 3D clay render, isometric line art), line quality (weight, wobble, outlines or none), texture and grain, lighting and shading, composition habits (centred single subject, lots of negative space, grid, diagonal), level of detail. Style only, no subject matter.>",
+  "motion": { "pace": "calm" | "brisk" | "snappy", "notes": "<optional short phrase on easing and movement character, under 120 characters>" },
+  "codeTheme": "<one of: ${CODE_THEMES.join(", ")}>",
+  "mood": ["<up to 5 single words>"]
+}
+
+Meaning of the palette fields: bg = the dominant background or ground colour as actually seen; ink = the main foreground colour for shapes and text; accent = the one saturated or standout colour used sparingly; muted = a quiet tone near bg for hairlines, panels and secondary shapes; extra = 0 to 3 further colours that genuinely recur (use [] if none). Output pure JSON: no comments.
+
+Rules:
+- Colours must be exactly seven characters: # followed by six hex digits. Sample the real, dominant colours. Do not default to the palette you would pick yourself and do not round to pure black or white unless the source really is.
+- bg and ink must be clearly distinguishable. If the source is dark overall, bg is the dark colour and ink the light one.
+- codeTheme should suit the palette so a code block sits well in the page: dark looks get a dark theme (vitesse-dark, github-dark, one-dark-pro, nord, night-owl), light or paper-like looks get a light theme (vitesse-light, github-light, solarized-light).
+- typography: choose the type feel that matches the look (editorial or classic = serif, clean or technical = sans, code or terminal = mono).
+- Pick motion.pace from the mood of the material: calm (slow, spacious), brisk (steady, lively), snappy (fast, punchy).`;
+}
+
+export function lookUserText(
+  source: { kind: "image"; prompt?: string } | { kind: "motion"; code: string } | { kind: "text"; description: string },
+  post?: { title: string; text: string },
+): string {
+  const parts: string[] = [];
+  if (source.kind === "image") {
+    parts.push(
+      "The attached image is a finished illustration from the post. Extract its visual style." +
+        (source.prompt?.trim() ? `\n\nThe prompt that produced it (for context about intent only; describe the style that is actually visible, not the subject):\n${truncate(source.prompt.trim(), 1500)}` : ""),
+    );
+  } else if (source.kind === "motion") {
+    parts.push(
+      `Below is the source of a Remotion animation from the post. Extract its visual style: read the colours it actually uses (the dominant background, the foreground, the accent used sparingly, quiet tones), the font families (serif, sans or monospace), the shape language and the pacing (spring damping, durations, holds, easing). Describe style only, not what it shows.\n\n\`\`\`tsx\n${truncate(source.code, 20_000)}\n\`\`\``,
+    );
+  } else {
+    parts.push(
+      `Invent a coherent, specific look from this description. Choose real hex colours that suit it and make every field consistent with it.\n\nDescription:\n${truncate(source.description, 1500)}`,
+    );
+  }
+  if (post && (post.title || post.text)) {
+    parts.push(`Article context (use it only to sense the register of the blog post; the look must not depict its topic)\nTitle: ${post.title || "(untitled)"}\n${truncate(post.text || "", 1200)}`);
+  }
+  parts.push("Return the JSON object now.");
+  return parts.join("\n\n");
+}
+
+/** Builds the look the Mock extractor returns. */
+export const MOCK_LOOK_FIELDS = {
+  name: "Mock look",
+  palette: { bg: "#10141c", ink: "#e8edf5", accent: "#4cc9f0", muted: "#2a3342", extra: [] as string[] },
+  typography: { title: "sans", body: "sans" },
+  illustration: "Flat vector shapes on a dark ground, thin light outlines, a single cyan accent, generous negative space, no texture.",
+  motion: { pace: "brisk", notes: "Crisp eases, short holds." },
+  codeTheme: "night-owl",
+  mood: ["cool", "precise"],
+};
 
 // ---- Image prompt writer -------------------------------------------------------
 
@@ -317,8 +427,23 @@ export function imagePromptUser(opts: {
   aspect: string;
   current?: { prompt: string };
   post?: { title: string; text: string };
+  look?: Look | null;
+  /** Which reference images accompany the request. */
+  refs?: { current: boolean; look: boolean };
 }): string {
   const parts = [`Aspect ratio: ${opts.aspect}`];
+  if (opts.look) {
+    parts.push(
+      `LOOK (the shared visual style of this post; the new image must carry it while showing whatever the user asks for)\n${lookToPrompt(opts.look)}\nWrite the final image prompt so it states this style in concrete visual terms (medium, line, texture, palette colours by name and hex, lighting, composition). Describe a new subject, never reproduce the subject of the look's reference image.`,
+    );
+  }
+  if (opts.refs?.current && opts.refs.look) {
+    parts.push("Reference images are sent with the request: image 1 is the CURRENT image being refined (keep its subject and composition except for the requested change); image 2 is the STYLE reference for the post's look (match its style, not its content).");
+  } else if (opts.refs?.look) {
+    parts.push("One reference image is sent with the request: it is the STYLE reference for the post's look (match its style, not its content).");
+  } else if (opts.refs?.current) {
+    parts.push("One reference image is sent with the request: it is the CURRENT image being refined.");
+  }
   if (opts.current?.prompt) parts.push(`Current prompt:\n${opts.current.prompt}`);
   if (opts.post && (opts.post.title || opts.post.text)) {
     parts.push(`Article context\nTitle: ${opts.post.title || "(untitled)"}\n${truncate(opts.post.text || "", POST_TEXT_CAP)}`);
@@ -368,4 +493,34 @@ export function validateFactCheck(raw: unknown, citations: FactSource[], claim: 
   if (!summary) summary = "The check did not return a readable summary.";
   if (correction === claim.trim() || verdict === "supported") correction = "";
   return { verdict, summary, ...(correction ? { correction } : {}), sources };
+}
+
+// ---- Look / restyle output validation -----------------------------------------------
+
+/** Model text -> validated Look (new id, version 1), or null. `referenceUrl` is set from the source, never from the model. Exported for tests. */
+export function lookFromModel(text: string, referenceUrl?: string): Look | null {
+  const parsed = parseJsonObject(text);
+  if (!parsed || typeof parsed !== "object") return null;
+  const o: Record<string, unknown> = { ...(parsed as Record<string, unknown>), referenceUrl };
+  delete o.id;
+  delete o.version;
+  return validateLook(o, { id: crypto.randomUUID(), version: 1 });
+}
+
+const HEX_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\s*\(/;
+
+/**
+ * Validates a restyled composition reply: parses with extractArtifact, is complete, uses the theme, has a config
+ * and default export, and keeps no colour literals. Returns the code or an error string. Exported for tests.
+ */
+export function validateRestyle(text: string): { code: string } | { error: string } {
+  const art = extractArtifact(text);
+  if (!art || !art.complete || !art.code.trim()) return { error: "The model's reply did not contain a complete composition" };
+  const code = art.code.replace(/^\n+/, "").replace(/\s+$/, "") + "\n";
+  if (!usesTheme(code)) return { error: "The converted composition does not use the theme" };
+  if (!/export\s+const\s+config\b/.test(code) || !/export\s+default\b/.test(code)) {
+    return { error: "The converted composition lost its config or default export" };
+  }
+  if (HEX_LITERAL.test(code)) return { error: "The converted composition still contains hard-coded colours" };
+  return { code };
 }

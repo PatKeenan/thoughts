@@ -68,21 +68,20 @@
   min-width: 0;
 }
 .filename {
-  background: var(--code-bg);
-  color: var(--code-ink);
-  opacity: 1;
+  background: var(--fig-bg, var(--code-bg));
+  color: var(--fig-ink, var(--code-ink));
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 0.6rem 1rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--code-ink) 18%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--fig-ink, var(--code-ink)) 18%, transparent);
   overflow-x: auto;
   white-space: nowrap;
 }
 .code {
-  background: var(--code-bg);
-  color: var(--code-ink);
+  background: var(--fig-bg, var(--code-bg));
+  color: var(--fig-ink, var(--code-ink));
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }

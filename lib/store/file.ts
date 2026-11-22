@@ -11,6 +11,20 @@ interface Db {
 
 const EMPTY_DOC = () => ({ type: "doc", content: [{ type: "paragraph" }] });
 
+/** Old db.json files predate `look`: default it. */
+function norm(p: Post): Post {
+  return p.look === undefined ? { ...p, look: null } : p;
+}
+
+function normSettings(s: Partial<Settings>): Settings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...s,
+    defaultLook: s.defaultLook ?? null,
+    savedLooks: Array.isArray(s.savedLooks) ? s.savedLooks : [],
+  };
+}
+
 function summarize(p: Post): PostSummary {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { content, ...rest } = p;
@@ -39,7 +53,7 @@ export function createFileStore(): Store {
   async function read(): Promise<Db> {
     try {
       const raw = JSON.parse(await fs.readFile(file, "utf8")) as Partial<Db>;
-      return { posts: raw.posts ?? [], settings: raw.settings ?? {} };
+      return { posts: (raw.posts ?? []).map(norm), settings: raw.settings ?? {} };
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === "ENOENT") return { posts: [], settings: {} };
       throw e;
@@ -77,6 +91,7 @@ export function createFileStore(): Store {
           content: EMPTY_DOC(),
           status: "draft",
           publishAt: null,
+          look: null,
           createdAt: now,
           updatedAt: now,
         };
@@ -90,7 +105,7 @@ export function createFileStore(): Store {
         const db = await read();
         const post = db.posts.find((p) => p.id === id);
         if (!post) return null;
-        for (const k of ["title", "slug", "excerpt", "content", "status", "publishAt"] as const) {
+        for (const k of ["title", "slug", "excerpt", "content", "status", "publishAt", "look"] as const) {
           if (patch[k] !== undefined) (post as unknown as Record<string, unknown>)[k] = patch[k];
         }
         post.updatedAt = new Date().toISOString();
@@ -126,14 +141,14 @@ export function createFileStore(): Store {
       }),
 
     getSettings: () =>
-      run(async () => ({ ...DEFAULT_SETTINGS, ...(await read()).settings })),
+      run(async () => normSettings((await read()).settings)),
 
     updateSettings: (patch) =>
       run(async () => {
         const db = await read();
         db.settings = { ...db.settings, ...patch };
         await write(db);
-        return { ...DEFAULT_SETTINGS, ...db.settings };
+        return normSettings(db.settings);
       }),
   };
 }

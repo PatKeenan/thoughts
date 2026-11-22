@@ -3,17 +3,23 @@
 
 import { extractArtifact } from "@/lib/studio/parse";
 import { langFromPath } from "@/lib/lang";
+import { api } from "@/lib/client/api";
+import { isOffLook, motionThemeFromLook, stampOf, usesTheme } from "@/lib/look";
 import type {
   Aspect,
   ChatMessage,
   CodeData,
   FileResult,
   GenBlockAttrs,
+  GenKind,
   ImageData,
   JobEvent,
+  Look,
+  LookStamp,
   MotionConfig,
   MotionData,
   MotionOutput,
+  MotionTheme,
   RepoData,
   RepoInfo,
   TreeEntry,
@@ -37,6 +43,8 @@ export interface StudioRequest {
   current?: CodeData | { code: string };
   context?: { files: ContextFile[] };
   post?: { title: string; text: string };
+  /** kind "motion": the post look (pace/mood guidance). Ignored for code. */
+  look?: Look | null;
 }
 
 function redirectToLogin(): Promise<never> {
@@ -138,6 +146,7 @@ export interface ImageRequest {
   current?: ImageData;
   aspect: Aspect;
   post?: { title: string; text: string };
+  look?: Look | null;
 }
 
 /** POST /api/ai/image (not streamed; can take 10-30 s). */
@@ -273,7 +282,7 @@ async function postJob(
 
 /** POST /api/render: render a composition to an asset. */
 export function renderMotion(
-  body: { code: string; output: MotionOutput },
+  body: { code: string; output: MotionOutput; theme?: MotionTheme },
   onEvent: (e: JobEvent) => void,
   signal?: AbortSignal,
 ): Promise<JobDone> {
@@ -282,7 +291,7 @@ export function renderMotion(
 
 /** POST /api/ai/video: generate a clip with the video model. */
 export function generateClip(
-  body: { prompt: string; aspect: Aspect; seconds: number },
+  body: { prompt: string; aspect: Aspect; seconds: number; look?: Look | null },
   onEvent: (e: JobEvent) => void,
   signal?: AbortSignal,
 ): Promise<JobDone> {
@@ -414,6 +423,8 @@ export interface ClipData {
   url: string;
   width: number;
   height: number;
+  /** look the clip was generated with (see LookStamp; undefined = no post look at the time) */
+  look?: LookStamp;
 }
 
 export type Version =
@@ -452,6 +463,10 @@ export interface PendingRequest {
   /** kind "clip" */
   prompt?: string;
   seconds?: number;
+  /** the look sent with the request (null = none) */
+  look: Look | null;
+  /** stamp given to what this request produces (undefined = the post had no look) */
+  stamp: LookStamp | undefined;
 }
 
 export type StudioView = "chat" | "github";
@@ -467,6 +482,9 @@ export interface RenderJob {
   phase: "running" | "error" | "done";
   message?: string;
   result?: { url: string; width: number; height: number };
+  /** the look whose theme the render uses (null = default theme) */
+  look: Look | null;
+  stamp: LookStamp | undefined;
 }
 
 /** The per-mode part of a motion session, parked while the other mode is shown. */
@@ -515,6 +533,12 @@ export interface StudioState {
   render: RenderJob | null;
   /** the motion block being edited, as it was opened (for the skip-render rule) */
   initial: MotionData | null;
+
+  // ---- look ----
+  /** the post's effective look (null = none) */
+  look: Look | null;
+  /** "Use post look" switch (only meaningful when `look` is set) */
+  useLook: boolean;
 }
 
 export const ASPECTS: Aspect[] = ["16:9", "1:1", "4:5", "3:2"];
@@ -550,7 +574,30 @@ function emptyTrack(): Track {
   return { versions: [], index: -1, thread: [], draft: "", error: null };
 }
 
-export function initStudio(opts: { mode: StudioMode; existing?: GenBlockAttrs | null }): StudioState {
+// ---- Look helpers ----------------------------------------------------------------
+
+/** The stamp something made now would get: undefined without a post look, null when switched off. */
+export function lookStampFor(look: Look | null | undefined, useLook: boolean): LookStamp | undefined {
+  if (!look) return undefined;
+  return useLook ? stampOf(look) : null;
+}
+
+/** Two stamps describe the same rendering. null and undefined both mean "default theme / no look". */
+export function sameStamp(a: LookStamp | undefined, b: LookStamp | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  return a.id === b.id && a.version === b.version;
+}
+
+/** The look generation in this session uses (null when there is none or the switch is off). */
+export function activeLook(s: Pick<StudioState, "look" | "useLook">): Look | null {
+  return s.look && s.useLook ? s.look : null;
+}
+
+export function currentStamp(s: Pick<StudioState, "look" | "useLook">): LookStamp | undefined {
+  return lookStampFor(s.look, s.useLook);
+}
+
+export function initStudio(opts: { mode: StudioMode; existing?: GenBlockAttrs | null; look?: Look | null }): StudioState {
   const base: StudioState = {
     mode: opts.mode,
     view: opts.mode === "github" ? "github" : "chat",
@@ -579,9 +626,14 @@ export function initStudio(opts: { mode: StudioMode; existing?: GenBlockAttrs | 
     progress: null,
     render: null,
     initial: null,
+    look: opts.look ?? null,
+    useLook: true,
   };
   const ex = opts.existing;
   if (!ex) return base;
+  // Reopening restores the switch: a deliberate one-off (null) comes back off.
+  const exStamp = (ex.data as { look?: LookStamp } | undefined)?.look;
+  base.useLook = exStamp !== null;
   const versions: Version[] = [];
   let extra: Partial<StudioState> = {};
   if (ex.kind === "code" && typeof (ex.data as CodeData).code === "string") {
@@ -592,10 +644,9 @@ export function initStudio(opts: { mode: StudioMode; existing?: GenBlockAttrs | 
     const d = ex.data as Partial<ImageData>;
     const aspect = isAspect(d.aspect) ? d.aspect : "16:9";
     if (typeof d.url === "string" && d.url) {
-      versions.push({
-        kind: "image",
-        data: { url: d.url, alt: d.alt ?? "", prompt: typeof d.prompt === "string" ? d.prompt : "", aspect },
-      });
+      const data: ImageData = { url: d.url, alt: d.alt ?? "", prompt: typeof d.prompt === "string" ? d.prompt : "", aspect };
+      if (d.look !== undefined) data.look = d.look;
+      versions.push({ kind: "image", data });
     }
     extra = { mode: "image", aspect, alt: d.alt ?? "", altEdited: !!d.alt, caption: d.caption ?? "" };
   } else if (ex.kind === "motion") {
@@ -613,6 +664,7 @@ export function initStudio(opts: { mode: StudioMode; existing?: GenBlockAttrs | 
       alt: d.alt ?? "",
       caption: d.caption,
     };
+    if (d.look !== undefined) initial.look = d.look;
     extra = { mode: "motion", motionMode: initial.mode, output, alt: initial.alt, altEdited: true, caption: d.caption ?? "", initial };
     if (initial.mode === "code" && typeof d.code === "string" && d.code.trim()) {
       versions.push({ kind: "motion", data: { code: d.code } });
@@ -623,10 +675,9 @@ export function initStudio(opts: { mode: StudioMode; existing?: GenBlockAttrs | 
       extra.output = output === "gif" ? "loop" : output;
       extra.draft = d.prompt ?? "";
       if (initial.url) {
-        versions.push({
-          kind: "clip",
-          data: { prompt: d.prompt ?? "", aspect, seconds: 6, url: initial.url, width: initial.width, height: initial.height },
-        });
+        const clip: ClipData = { prompt: d.prompt ?? "", aspect, seconds: 6, url: initial.url, width: initial.width, height: initial.height };
+        if (d.look !== undefined) clip.look = d.look;
+        versions.push({ kind: "clip", data: clip });
       }
     }
   }
@@ -731,7 +782,9 @@ export type StudioAction =
   | { type: "renderDone"; id: number; url: string; width: number; height: number }
   | { type: "renderFail"; id: number; message: string }
   | { type: "renderCancel" }
-  | { type: "renderDismiss" };
+  | { type: "renderDismiss" }
+  | { type: "useLook"; on: boolean }
+  | { type: "look"; look: Look | null };
 
 function lastUserText(thread: ThreadItem[]): string {
   for (let i = thread.length - 1; i >= 0; i--) if (thread[i].role === "user") return thread[i].content;
@@ -747,6 +800,8 @@ function startRequest(s: StudioState, thread: ThreadItem[], base: number): Studi
     base,
     messages: historyOf(thread),
     context: s.context,
+    look: kind === "code" ? null : activeLook(s),
+    stamp: kind === "code" ? undefined : currentStamp(s),
   };
   if (kind === "code") request.current = v && v.kind === "code" ? v.data : undefined;
   if (kind === "motion" && v && v.kind === "motion") request.code = v.data.code;
@@ -888,6 +943,7 @@ export function studioReducer(s: StudioState, a: StudioAction): StudioState {
         prompt: a.image.prompt ?? "",
         aspect: isAspect(a.image.aspect) ? a.image.aspect : s.request.aspect ?? s.aspect,
       };
+      if (s.request.stamp !== undefined) image.look = s.request.stamp;
       const cleared: StudioState = { ...s, request: null, streamText: "" };
       if (!s.altEdited && image.alt) {
         cleared.alt = image.alt;
@@ -911,6 +967,7 @@ export function studioReducer(s: StudioState, a: StudioAction): StudioState {
         width: a.width,
         height: a.height,
       };
+      if (r.stamp !== undefined) data.look = r.stamp;
       const cleared: StudioState = {
         ...s,
         request: null,
@@ -1084,7 +1141,14 @@ export function studioReducer(s: StudioState, a: StudioAction): StudioState {
       if (isBusy(s) || !v || v.kind !== "motion" || !v.data.code.trim()) return s;
       return {
         ...s,
-        render: { id: s.nextId, code: v.data.code, output: s.output, phase: "running" },
+        render: {
+          id: s.nextId,
+          code: v.data.code,
+          output: s.output,
+          phase: "running",
+          look: activeLook(s),
+          stamp: currentStamp(s),
+        },
         progress: { label: "Starting render", progress: 0 },
         handEdit: false,
         handVersion: null,
@@ -1112,6 +1176,15 @@ export function studioReducer(s: StudioState, a: StudioAction): StudioState {
     case "renderDismiss":
       if (!s.render || s.render.phase === "done") return s;
       return { ...s, render: null, progress: null };
+
+    case "useLook":
+      // Applies to the next generation/render; never changes what is on screen.
+      if (isBusy(s) || a.on === s.useLook) return s;
+      return { ...s, useLook: a.on, dirty: true };
+
+    case "look":
+      if (a.look === s.look) return s;
+      return { ...s, look: a.look };
   }
 }
 
@@ -1125,6 +1198,7 @@ export type StudioCommitResult = Pick<GenBlockAttrs, "kind" | "data" | "history"
 export function buildImageData(v: ImageData, alt: string, caption: string): ImageData {
   const data: ImageData = { url: v.url, alt: alt.trim(), prompt: v.prompt, aspect: v.aspect };
   if (caption.trim()) data.caption = caption.trim();
+  if (v.look !== undefined) data.look = v.look;
   return data;
 }
 
@@ -1138,6 +1212,8 @@ export function buildMotionData(opts: {
   asset: { url: string; width: number; height: number };
   alt: string;
   caption: string;
+  /** undefined = leave unset (the post has no look) */
+  look?: LookStamp;
 }): MotionData {
   const data: MotionData = {
     mode: opts.mode,
@@ -1154,6 +1230,7 @@ export function buildMotionData(opts: {
     data.prompt = opts.prompt ?? "";
   }
   if (opts.caption.trim()) data.caption = opts.caption.trim();
+  if (opts.look !== undefined) data.look = opts.look;
   return data;
 }
 
@@ -1171,7 +1248,7 @@ export type CommitPlan =
 
 /**
  * What "Add inline"/"Update" should do now. Animations render first unless a
- * render of exactly this code+output exists (just made, or the opened block's).
+ * render of exactly this code+output+look exists (just made, or the opened block's).
  * `skipRender` = "Add without rendering" (url "").
  */
 export function planCommit(s: StudioState, opts: { skipRender?: boolean } = {}): CommitPlan {
@@ -1192,22 +1269,31 @@ export function planCommit(s: StudioState, opts: { skipRender?: boolean } = {}):
       asset: { url: v.data.url, width: v.data.width, height: v.data.height },
       alt: s.alt,
       caption: s.caption,
+      look: v.data.look,
     });
     return { type: "commit", result: { kind: "motion", data: { ...data }, history } };
   }
   // Animation.
   const code = v.data.code;
   const config = configFor(s, code);
+  const stamp = currentStamp(s);
   let asset: { url: string; width: number; height: number } | null = null;
   const r = s.render;
-  if (r && r.phase === "done" && r.result && r.code === code && r.output === s.output) asset = r.result;
-  else if (s.initial && s.initial.mode === "code" && s.initial.url && s.initial.code === code && s.initial.output === s.output) {
+  if (r && r.phase === "done" && r.result && r.code === code && r.output === s.output && sameStamp(r.stamp, stamp)) asset = r.result;
+  else if (
+    s.initial &&
+    s.initial.mode === "code" &&
+    s.initial.url &&
+    s.initial.code === code &&
+    s.initial.output === s.output &&
+    sameStamp(s.initial.look, stamp)
+  ) {
     asset = { url: s.initial.url, width: s.initial.width, height: s.initial.height };
   } else if (opts.skipRender) {
     asset = { url: "", width: config?.width ?? 0, height: config?.height ?? 0 };
   }
   if (!asset) return { type: "render" };
-  const data = buildMotionData({ mode: "code", code, config, output: s.output, asset, alt: s.alt, caption: s.caption });
+  const data = buildMotionData({ mode: "code", code, config, output: s.output, asset, alt: s.alt, caption: s.caption, look: stamp });
   return { type: "commit", result: { kind: "motion", data: { ...data }, history } };
 }
 
@@ -1228,4 +1314,229 @@ export function streamingArtifact(s: StudioState): CodeData | null {
 export function newBlockId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return "g" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+// ---- Look: off-look blocks, restyle, auto-capture ---------------------------------
+
+/** How a block follows the look. Code and repo blocks don't (code is themed at render time). */
+export type RestyleKind = "image" | "animation" | "clip";
+
+export function restyleKindOf(kind: GenKind | string, data: unknown): RestyleKind | null {
+  const d = (data ?? {}) as Record<string, unknown>;
+  if (kind === "image") return typeof d.url === "string" && d.url ? "image" : null;
+  if (kind === "motion") {
+    if (d.mode === "clip") return typeof d.prompt === "string" && d.prompt.trim() ? "clip" : null;
+    return typeof d.code === "string" && d.code.trim() ? "animation" : null;
+  }
+  return null;
+}
+
+export interface OffLookItem {
+  id: string;
+  kind: RestyleKind;
+}
+
+/** Structural slice of a ProseMirror node, so this stays testable without an editor. */
+interface DocLike {
+  descendants(f: (node: { type: { name: string }; attrs: Record<string, unknown> }) => boolean | void): void;
+}
+
+/** Off-look image/motion blocks in document order. */
+export function offLookBlocks(doc: DocLike, look: Look | null | undefined): OffLookItem[] {
+  if (!look) return [];
+  const out: OffLookItem[] = [];
+  doc.descendants((node) => {
+    if (node.type.name !== "genBlock") return true;
+    const id = typeof node.attrs.id === "string" ? node.attrs.id : "";
+    const kind = restyleKindOf(node.attrs.kind as string, node.attrs.data);
+    if (id && kind && isOffLook((node.attrs.data as { look?: LookStamp } | null)?.look, look)) out.push({ id, kind });
+    return false;
+  });
+  return out;
+}
+
+export type ExtractSource = { kind: "image"; url: string; prompt?: string } | { kind: "motion"; code: string };
+
+/** What "Use as the look" / auto-capture reads from a block; null when the block can't set a look. */
+export function captureSource(kind: GenKind | string, data: unknown): ExtractSource | null {
+  const k = restyleKindOf(kind, data);
+  const d = (data ?? {}) as Record<string, unknown>;
+  if (k === "image") {
+    const src: ExtractSource = { kind: "image", url: d.url as string };
+    if (typeof d.prompt === "string" && d.prompt) src.prompt = d.prompt;
+    return src;
+  }
+  if (k === "animation") return { kind: "motion", code: d.code as string };
+  return null;
+}
+
+/** Does the block's data still hold what the look was read from? */
+export function sourceStillMatches(src: ExtractSource, data: unknown): boolean {
+  const d = (data ?? {}) as Record<string, unknown>;
+  return src.kind === "image" ? d.url === src.url : d.code === src.code;
+}
+
+export const RESTYLE_IMAGE_TEXT = "Restyle this to match the post's look. Keep the same subject and composition.";
+
+export interface RestyleInput {
+  kind: GenKind | string;
+  data: Record<string, unknown>;
+  history: ChatMessage[];
+  look: Look;
+  signal?: AbortSignal;
+  onProgress?(p: { label: string; progress: number }): void;
+  post?: { title: string; text: string };
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw abortError();
+}
+
+/**
+ * Bring one block in line with `look`. Returns the block's new data and history.
+ * - animation: convert hard-coded colours once (AI), then re-render with the look's theme
+ * - image: redraw via /api/ai/image with the look, keeping alt/caption; the turn joins the history
+ * - clip: regenerate via /api/ai/video with the stored prompt (costly; per-block only)
+ */
+export async function restyleData(input: RestyleInput): Promise<{ data: Record<string, unknown>; history: ChatMessage[] }> {
+  const { data, history, look, signal, onProgress } = input;
+  const kind = restyleKindOf(input.kind, data);
+  const stamp = stampOf(look);
+  const progress = (label: string, p: number) => {
+    if (!signal?.aborted) onProgress?.({ label, progress: p });
+  };
+  throwIfAborted(signal);
+
+  if (kind === "animation") {
+    const d = data as unknown as MotionData;
+    let code = d.code ?? "";
+    if (!usesTheme(code)) {
+      progress("Converting colours", 0);
+      code = await api.restyleMotion(code);
+      throwIfAborted(signal);
+    }
+    progress("Starting render", 0);
+    const done = await renderMotion(
+      { code, output: d.output, theme: motionThemeFromLook(look) },
+      (ev) => {
+        if (ev.type === "progress") progress(ev.label, ev.progress);
+      },
+      signal,
+    );
+    throwIfAborted(signal);
+    const next: MotionData = { ...d, code, url: done.url, width: done.width, height: done.height, look: stamp };
+    if (code !== d.code) delete next.config; // the preview re-reads it
+    return { data: next as unknown as Record<string, unknown>, history };
+  }
+
+  if (kind === "image") {
+    const d = data as unknown as ImageData;
+    progress("Redrawing", 0);
+    const messages: ChatMessage[] = [...history, { role: "user", content: RESTYLE_IMAGE_TEXT }];
+    const aspect = isAspect(d.aspect) ? d.aspect : "16:9";
+    const r = await generateImage({ messages, current: d, aspect, post: input.post, look }, signal);
+    throwIfAborted(signal);
+    const next: ImageData = {
+      url: r.image.url,
+      alt: d.alt,
+      prompt: r.image.prompt ?? d.prompt,
+      aspect: isAspect(r.image.aspect) ? r.image.aspect : aspect,
+      look: stamp,
+    };
+    if (d.caption) next.caption = d.caption;
+    const turn: ChatMessage[] = [{ role: "user", content: RESTYLE_IMAGE_TEXT }];
+    if (r.note.trim()) turn.push({ role: "assistant", content: r.note.trim() });
+    return { data: next as unknown as Record<string, unknown>, history: [...history, ...turn] };
+  }
+
+  if (kind === "clip") {
+    const d = data as unknown as MotionData;
+    progress("Starting", 0);
+    const done = await generateClip(
+      { prompt: d.prompt ?? "", aspect: aspectFrom(d.width, d.height, CLIP_ASPECTS), seconds: 6, look },
+      (ev) => {
+        if (ev.type === "progress") progress(ev.label, ev.progress);
+      },
+      signal,
+    );
+    throwIfAborted(signal);
+    const next: MotionData = { ...d, url: done.url, width: done.width, height: done.height, look: stamp };
+    return { data: next as unknown as Record<string, unknown>, history };
+  }
+
+  throw new Error("This block can't be restyled.");
+}
+
+export interface RestyleQueueState {
+  done: number;
+  total: number;
+  label: string;
+  /** id of the block being restyled now */
+  current: string | null;
+}
+
+export function restyleLabel(kind: RestyleKind, i: number, total: number): string {
+  const n = total > 1 ? ` ${i + 1} of ${total}` : "";
+  return kind === "image" ? `Redrawing image${n}` : kind === "animation" ? `Rendering animation${n}` : `Regenerating clip${n}`;
+}
+
+/**
+ * Restyle blocks one at a time, in order. Clips are skipped (they are per-block only).
+ * A failure doesn't stop the queue; aborting `signal` stops it (finished ones stay).
+ * A single item aborted on its own (its block's Cancel) is skipped, not counted as failed.
+ */
+export async function runRestyleQueue(opts: {
+  items: OffLookItem[];
+  run(item: OffLookItem, signal: AbortSignal): Promise<void>;
+  signal: AbortSignal;
+  onUpdate(state: RestyleQueueState): void;
+}): Promise<{ done: number; failed: number; cancelled: boolean }> {
+  const items = opts.items.filter((it) => it.kind !== "clip");
+  const total = items.length;
+  let done = 0;
+  let failed = 0;
+  for (let i = 0; i < total; i++) {
+    if (opts.signal.aborted) break;
+    const item = items[i];
+    opts.onUpdate({ done, total, label: restyleLabel(item.kind, i, total), current: item.id });
+    try {
+      await opts.run(item, opts.signal);
+    } catch (e) {
+      if (opts.signal.aborted) break;
+      if (!isAbort(e)) failed++;
+    }
+    done++;
+  }
+  const cancelled = opts.signal.aborted;
+  opts.onUpdate({ done, total, label: cancelled ? "Stopped" : "Done", current: null });
+  return { done, failed, cancelled };
+}
+
+/**
+ * Auto-capture: the first image/animation added to a post without a look sets it.
+ * Never when a look exists, never twice at once; failures are silent.
+ * `apply` receives the look, the block and the source it came from (the caller stamps the block).
+ */
+export function createAutoCapture(deps: {
+  getLook(): Look | null;
+  extract(source: ExtractSource): Promise<Look>;
+  apply(look: Look, attrs: Pick<GenBlockAttrs, "id" | "kind" | "data">, source: ExtractSource): void;
+}) {
+  let inFlight = false;
+  return async function capture(attrs: Pick<GenBlockAttrs, "id" | "kind" | "data">): Promise<"skipped" | "set" | "failed"> {
+    if (inFlight || deps.getLook()) return "skipped";
+    const src = captureSource(attrs.kind, attrs.data);
+    if (!src) return "skipped";
+    inFlight = true;
+    try {
+      const look = await deps.extract(src);
+      if (deps.getLook()) return "skipped"; // a look arrived meanwhile: never overwrite it
+      deps.apply(look, attrs, src);
+      return "set";
+    } catch {
+      return "failed";
+    } finally {
+      inFlight = false;
+    }
+  };
 }

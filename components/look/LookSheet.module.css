@@ -1,0 +1,340 @@
+/* Look sheet. Chrome follows the house tokens; only .specimen / .sample / .dot draw other colours. */
+.section {
+  margin-top: 1.25rem;
+}
+.label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.gap {
+  margin-top: 0.9rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+}
+.quiet {
+  margin: 1rem 0 0;
+  color: var(--ink-2);
+  font-size: 0.95rem;
+}
+.plain {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+.help {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+.input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.6rem 0.7rem;
+  font-family: var(--font-body);
+  font-size: 1rem; /* 16px: no iOS zoom on focus */
+  line-height: 1.4;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+textarea.input {
+  resize: vertical;
+}
+.input:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+}
+select.input {
+  font-family: var(--font-ui);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.6rem;
+}
+.primary,
+.secondary {
+  min-height: var(--tap);
+  padding: 0 1.1rem;
+  font: inherit;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+}
+.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+}
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.danger {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.text {
+  min-height: var(--tap);
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 0.25em;
+  white-space: nowrap;
+}
+.text:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dangerText {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+.error {
+  margin: 0.6rem 0 0;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+.errorBox {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--accent);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.errorBox p {
+  margin: 0;
+}
+
+/* Segmented control (as in the publish sheet) */
+.seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.segBtn {
+  min-height: var(--tap);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.segBtn + .segBtn {
+  border-left: 1px solid var(--ink);
+}
+.segBtn[aria-checked="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Colour swatches: real colour inputs, styled */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.75rem;
+}
+.swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.swatchLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+}
+.swatchName {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.color {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+}
+.color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color::-webkit-color-swatch {
+  border: 0;
+  border-radius: 0;
+}
+.color::-moz-color-swatch {
+  border: 0;
+  border-radius: 0;
+}
+.color:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.hex {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+
+/* Reference */
+.refRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.thumb {
+  width: 5rem;
+  height: 5rem;
+  object-fit: cover;
+  border: 1px solid var(--rule);
+  display: block;
+}
+
+/* Progress (determinate hairline) */
+.bar {
+  height: 2px;
+  background: var(--rule);
+}
+.barFill {
+  height: 100%;
+  background: var(--ink);
+  transition: width 200ms var(--ease);
+}
+
+/* Saved looks */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+.itemMain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+}
+.itemName {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.itemActions {
+  display: flex;
+  gap: 1.25rem;
+}
+.badges {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--ink-2);
+  color: var(--ink-2);
+}
+.dots {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+.dot {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 1px solid var(--ink-3);
+}
+
+/* Specimen: drawn with inline colours from the look; layout only here */
+.specimen {
+  padding: 0.9rem 1rem 1rem;
+  margin-top: 0.25rem;
+}
+.specTitle {
+  font-size: 1.5rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.specBody {
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.sample,
+.samplePlain {
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+.sample {
+  padding: 0.5rem 0.75rem;
+}
+.sample pre,
+.samplePlain {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font-family: inherit;
+  white-space: pre;
+}
+.samplePlain {
+  padding: 0.5rem 0.75rem;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.sample code,
+.samplePlain code {
+  font-family: inherit;
+}

@@ -13,7 +13,7 @@ export interface SlashItem {
   disabled?: boolean;
   tool?: ToolKind;
   /** Non-studio actions handled by the editor screen. */
-  action?: "fact";
+  action?: "fact" | "look";
   run?: (editor: Editor, range: Range) => void;
 }
 
@@ -52,6 +52,13 @@ export const SLASH_ITEMS: SlashItem[] = [
     hint: "Check the sentence you're in",
     keywords: ["fact", "check", "verify", "claim"],
     action: "fact",
+  },
+  {
+    id: "look",
+    label: "Look",
+    hint: "Set or change this post's look",
+    keywords: ["look", "theme", "style", "palette", "colours", "colors"],
+    action: "look",
   },
   {
     id: "h2",
@@ -144,6 +151,8 @@ export class SlashController {
   readonly tool = new Handler<{ tool: ToolKind; pos: number }>();
   /** Set by the editor screen: open the fact-check sheet for the current selection. */
   readonly fact = new Handler<void>();
+  /** Set by the editor screen: open the Look sheet. */
+  readonly look = new Handler<void>();
   private listeners = new Set<() => void>();
   private props: SuggestionProps<SlashItem, SlashItem> | null = null;
   private editor: Editor | null = null;
@@ -263,6 +272,12 @@ export const SlashCommand = Extension.create<{ controller: SlashController | nul
             editor.chain().focus().deleteRange(range).run();
             editor.commands.blur();
             controller.fact.call();
+            return;
+          }
+          if (item.action === "look") {
+            editor.chain().focus().deleteRange(range).run();
+            editor.commands.blur();
+            controller.look.call();
             return;
           }
           if (item.tool) {

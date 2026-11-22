@@ -1,12 +1,24 @@
 import { neon } from "@neondatabase/serverless";
 import { randomUUID } from "node:crypto";
-import { DEFAULT_SETTINGS, type DocNode, type Post, type PostStatus, type PostSummary, type Settings } from "@/lib/types";
+import { DEFAULT_SETTINGS, type DocNode, type Look, type Post, type PostStatus, type PostSummary, type Settings } from "@/lib/types";
 import type { Store } from "./index";
 
 type Row = Record<string, unknown>;
 
 const iso = (v: unknown): string => (v instanceof Date ? v : new Date(v as string)).toISOString();
 const isoOrNull = (v: unknown): string | null => (v == null ? null : iso(v));
+
+function parseLook(v: unknown): Look | null {
+  if (v == null) return null;
+  if (typeof v === "string") {
+    try {
+      return (JSON.parse(v) as Look | null) ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return v as Look;
+}
 
 function toSummary(r: Row): PostSummary {
   return {
@@ -16,6 +28,7 @@ function toSummary(r: Row): PostSummary {
     excerpt: r.excerpt as string,
     status: r.status as PostStatus,
     publishAt: isoOrNull(r.publish_at),
+    look: parseLook(r.look),
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
   };
@@ -26,7 +39,7 @@ function toPost(r: Row): Post {
   return { ...toSummary(r), content };
 }
 
-const SUMMARY_COLS = "id, slug, title, excerpt, status, publish_at, created_at, updated_at";
+const SUMMARY_COLS = "id, slug, title, excerpt, status, publish_at, look, created_at, updated_at";
 
 export function createPostgresStore(url: string): Store {
   const sql = neon(url);
@@ -46,6 +59,7 @@ export function createPostgresStore(url: string): Store {
           created_at timestamptz not null default now(),
           updated_at timestamptz not null default now()
         )`);
+        await sql.query(`alter table posts add column if not exists look jsonb`);
         await sql.query(`create unique index if not exists posts_slug_key on posts (slug) where slug <> ''`);
         await sql.query(`create table if not exists settings (
           key text primary key,
@@ -91,14 +105,15 @@ export function createPostgresStore(url: string): Store {
         content: "content",
         status: "status",
         publishAt: "publish_at",
+        look: "look",
       };
       const sets: string[] = [];
       const params: unknown[] = [];
       for (const [key, col] of Object.entries(cols)) {
         const v = (patch as Record<string, unknown>)[key];
         if (v === undefined) continue;
-        params.push(key === "content" ? JSON.stringify(v) : v);
-        sets.push(`${col} = $${params.length}${key === "content" ? "::jsonb" : key === "publishAt" ? "::timestamptz" : ""}`);
+        params.push(key === "content" || key === "look" ? (v === null ? null : JSON.stringify(v)) : v);
+        sets.push(`${col} = $${params.length}${key === "content" || key === "look" ? "::jsonb" : key === "publishAt" ? "::timestamptz" : ""}`);
       }
       sets.push("updated_at = now()");
       params.push(id);
@@ -140,7 +155,7 @@ export function createPostgresStore(url: string): Store {
     async getSettings() {
       const rows = await q(`select value from settings where key = 'site'`);
       const stored = (rows[0]?.value ?? {}) as Partial<Settings>;
-      return { ...DEFAULT_SETTINGS, ...stored };
+      return { ...DEFAULT_SETTINGS, ...stored, defaultLook: stored.defaultLook ?? null, savedLooks: Array.isArray(stored.savedLooks) ? stored.savedLooks : [] };
     },
 
     async updateSettings(patch) {

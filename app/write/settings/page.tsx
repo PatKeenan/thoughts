@@ -47,6 +47,29 @@ export default function SettingsPage() {
     }
   }
 
+  const [armRemove, setArmRemove] = useState(false);
+  const [lookErr, setLookErr] = useState("");
+  useEffect(() => {
+    if (!armRemove) return;
+    const t = setTimeout(() => setArmRemove(false), 3000);
+    return () => clearTimeout(t);
+  }, [armRemove]);
+
+  async function removeDefaultLook() {
+    if (!armRemove) {
+      setArmRemove(true);
+      return;
+    }
+    setArmRemove(false);
+    setLookErr("");
+    try {
+      const next = await api.patchSettings({ defaultLook: null });
+      setS((cur) => (cur ? { ...cur, defaultLook: next.defaultLook ?? null } : cur));
+    } catch (e2) {
+      setLookErr(e2 instanceof Error ? e2.message : "Could not remove the default look");
+    }
+  }
+
   async function signOut() {
     try {
       await api.logout();
@@ -118,6 +141,39 @@ export default function SettingsPage() {
               matches this and your published posts.
             </span>
           </label>
+
+          <div className={styles.field}>
+            <span className={styles.label}>Default look</span>
+            {s.defaultLook ? (
+              <div className={styles.lookRow}>
+                <span className={styles.lookName}>{s.defaultLook.name}</span>
+                <span className={styles.dots} aria-hidden="true">
+                  {[
+                    s.defaultLook.palette.bg,
+                    s.defaultLook.palette.ink,
+                    s.defaultLook.palette.accent,
+                    s.defaultLook.palette.muted,
+                    ...s.defaultLook.palette.extra,
+                  ].map((c, i) => (
+                    <span key={i} className={styles.dot} style={{ background: c }} />
+                  ))}
+                </span>
+                <button type="button" className={styles.link} onClick={removeDefaultLook}>
+                  {armRemove ? "Tap again to remove" : "Remove"}
+                </button>
+              </div>
+            ) : (
+              <span className={styles.muted}>None. Posts without their own look use the standard style.</span>
+            )}
+            {lookErr && (
+              <span className={styles.bad} role="alert">
+                {lookErr}
+              </span>
+            )}
+            <span className={styles.help}>
+              Used by posts that have no look of their own. Set it from a post&rsquo;s Look sheet.
+            </span>
+          </div>
 
           <div className={styles.saveRow}>
             <button type="submit" className={styles.primary} disabled={state === "saving"}>

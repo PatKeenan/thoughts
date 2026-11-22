@@ -2,14 +2,51 @@
 
 // Editor views of image and motion genBlocks.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Editor } from "@tiptap/core";
 import type { Aspect, ImageData, MotionConfig, MotionData } from "@/lib/types";
-import { errorMessage, isAbort, renderMotion } from "@/lib/client/studio";
+import { errorMessage, isAbort, renderMotion, sameStamp } from "@/lib/client/studio";
+import { motionThemeFromLook, stampOf } from "@/lib/look";
 import MotionPreview from "@/components/motion/MotionPreview";
 import { ProgressBar } from "@/components/studio/parts";
 import { patchGenBlockData } from "./insert";
+import { useLook } from "./LookContext";
 import styles from "./MediaView.module.css";
+
+/** The inline progress row (render / restyle): bar + Cancel, or a message + actions. */
+export function JobRow({
+  progress,
+  message,
+  error,
+  onCancel,
+  actions,
+}: {
+  progress?: { label: string; progress: number };
+  message?: string;
+  error?: boolean;
+  onCancel?(): void;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className={styles.unrendered}>
+      {progress ? (
+        <>
+          <ProgressBar label={progress.label} progress={progress.progress} />
+          {onCancel && (
+            <button type="button" className={styles.btn} onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+        </>
+      ) : (
+        <>
+          <span className={error ? styles.error : styles.note}>{message}</span>
+          {actions}
+        </>
+      )}
+    </div>
+  );
+}
 
 const ASPECT_RE = /^\d+:\d+$/;
 
@@ -67,10 +104,25 @@ function VisibleVideo({ src, width, height }: { src: string; width: number; heig
 
 type RenderState = { phase: "running"; label: string; progress: number } | { phase: "error"; message: string } | null;
 
-export function MotionView({ data, id, editor }: { data: MotionData; id: string; editor: Editor }) {
+export function MotionView({
+  data,
+  id,
+  editor,
+  hideJob = false,
+}: {
+  data: MotionData;
+  id: string;
+  editor: Editor;
+  /** a restyle shows its own progress row for this block */
+  hideJob?: boolean;
+}) {
   const [job, setJob] = useState<RenderState>(null);
   const ctrlRef = useRef<AbortController | null>(null);
   const configRef = useRef<{ code: string; config: MotionConfig } | null>(null);
+  // A deliberate one-off (stamp null) keeps the default theme; otherwise the post look's.
+  const { look } = useLook();
+  const blockLook = data.look === null ? null : look;
+  const theme = useMemo(() => motionThemeFromLook(blockLook), [blockLook]);
 
   // Leaving (block removed, editor closed) cancels a render in flight.
   useEffect(() => () => ctrlRef.current?.abort(), []);
@@ -83,8 +135,10 @@ export function MotionView({ data, id, editor }: { data: MotionData; id: string;
     const ctrl = new AbortController();
     ctrlRef.current = ctrl;
     setJob({ phase: "running", label: "Starting render", progress: 0 });
+    const stamp = blockLook ? stampOf(blockLook) : data.look;
+    const startStamp = data.look;
     renderMotion(
-      { code, output },
+      { code, output, ...(blockLook ? { theme } : {}) },
       (ev) => {
         if (ev.type === "progress" && !ctrl.signal.aborted) setJob({ phase: "running", label: ev.label, progress: ev.progress });
       },
@@ -94,10 +148,20 @@ export function MotionView({ data, id, editor }: { data: MotionData; id: string;
         if (ctrl.signal.aborted) return;
         setJob(null);
         const patch: Record<string, unknown> = { url: d.url, width: d.width, height: d.height };
+        if (stamp !== undefined) patch.look = stamp;
         const c = configRef.current;
         if (c && c.code === code) patch.config = c.config;
         // Target the block by id; skip if it was removed or edited meanwhile.
-        patchGenBlockData(editor, id, patch, (cur) => cur.code === code && cur.output === output);
+        patchGenBlockData(
+          editor,
+          id,
+          patch,
+          (cur) =>
+            cur.code === code &&
+            cur.output === output &&
+            sameStamp(cur.look as MotionData["look"], startStamp) &&
+            (cur.look === null) === (startStamp === null),
+        );
       })
       .catch((e: unknown) => {
         if (ctrl.signal.aborted || isAbort(e)) return;
@@ -136,29 +200,25 @@ export function MotionView({ data, id, editor }: { data: MotionData; id: string;
       <figure className={styles.figure}>
         <MotionPreview
           code={code}
+          theme={theme}
           onStatus={(st) => {
             if (st.ok) configRef.current = { code, config: st.config };
           }}
         />
-        <div className={styles.unrendered}>
-          {job?.phase === "running" ? (
-            <>
-              <ProgressBar label={job.label} progress={job.progress} />
-              <button type="button" className={styles.btn} onClick={cancel}>
-                Cancel
-              </button>
-            </>
+        {!hideJob &&
+          (job?.phase === "running" ? (
+            <JobRow progress={job} onCancel={cancel} />
           ) : (
-            <>
-              <span className={job?.phase === "error" ? styles.error : styles.note}>
-                {job?.phase === "error" ? job.message : "Not rendered yet — won’t appear on the site"}
-              </span>
-              <button type="button" className={styles.btn} onClick={render}>
-                {job?.phase === "error" ? "Retry" : "Render"}
-              </button>
-            </>
-          )}
-        </div>
+            <JobRow
+              error={job?.phase === "error"}
+              message={job?.phase === "error" ? job.message : "Not rendered yet — won’t appear on the site"}
+              actions={
+                <button type="button" className={styles.btn} onClick={render}>
+                  {job?.phase === "error" ? "Retry" : "Render"}
+                </button>
+              }
+            />
+          ))}
         {data.caption && <figcaption className={styles.caption}>{data.caption}</figcaption>}
       </figure>
     );

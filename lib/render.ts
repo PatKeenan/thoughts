@@ -11,8 +11,10 @@ import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { putMedia } from "@/lib/media";
-import type { JobEvent, MotionConfig, MotionOutput } from "@/lib/types";
+import { DEFAULT_MOTION_THEME } from "@/lib/look";
+import type { JobEvent, MotionConfig, MotionOutput, MotionTheme } from "@/lib/types";
 import { checkMotion } from "@/remotion/check";
+import { sanitizeTheme } from "@/remotion/theme";
 import { COMPOSITION_ID, snapshotBlobKey, VERCEL_BUNDLE_DIR } from "@/remotion/constants";
 
 export type Emit = (e: JobEvent) => void;
@@ -86,10 +88,16 @@ export function cleanError(e: unknown): string {
  * Checks the code (no browser), renders it, stores the result and returns its URL.
  * Throws on any failure; progress is reported through `emit`.
  */
-export async function renderMotion(code: string, output: MotionOutput, emit: Emit): Promise<RenderResult> {
+export async function renderMotion(
+  code: string,
+  output: MotionOutput,
+  emit: Emit,
+  theme: MotionTheme = DEFAULT_MOTION_THEME,
+): Promise<RenderResult> {
   const config = checkMotion(code); // fails fast with a readable message
   const plan = renderPlan(config, output);
-  return process.env.VERCEL ? renderOnVercel(code, plan, emit) : renderLocally(code, plan, emit);
+  const safe = sanitizeTheme(theme); // callers other than the route are validated too
+  return process.env.VERCEL ? renderOnVercel(code, plan, emit, safe) : renderLocally(code, plan, emit, safe);
 }
 
 // ---- progress helper ---------------------------------------------------------
@@ -113,7 +121,7 @@ type RendererMod = typeof import("@remotion/renderer");
 type BundlerMod = typeof import("@remotion/bundler");
 
 const g = globalThis as unknown as {
-  __motionBundle?: Promise<string>;
+  __motionBundles?: Map<string, Promise<string>>; // keyed by source hash, so editing remotion/** in a running dev server rebundles
   __motionQueue?: Promise<unknown>;
   __motionQueued?: number;
 };
@@ -140,6 +148,8 @@ async function sourceHash(root: string): Promise<string> {
   for (const f of (await readdir(dir)).sort()) {
     if (/\.(ts|tsx)$/.test(f)) h.update(f).update(await readFile(path.join(dir, f)));
   }
+  // remotion/ imports the default theme from here.
+  h.update("lib/look.ts").update(await readFile(path.join(root, "lib", "look.ts")));
   try {
     h.update(JSON.parse(await readFile(path.join(root, "node_modules", "remotion", "package.json"), "utf8")).version);
   } catch {
@@ -149,11 +159,12 @@ async function sourceHash(root: string): Promise<string> {
 }
 
 /** Bundles remotion/index.ts once per process (and reuses an on-disk bundle with the same source hash). */
-function getLocalBundle(bundler: BundlerMod, emit: Emit): Promise<string> {
-  if (!g.__motionBundle) {
-    g.__motionBundle = (async () => {
-      const root = projectRoot();
-      const hash = await sourceHash(root);
+async function getLocalBundle(bundler: BundlerMod, emit: Emit): Promise<string> {
+  const root = projectRoot();
+  const hash = await sourceHash(root);
+  const bundles = (g.__motionBundles ??= new Map());
+  if (!bundles.has(hash)) {
+    bundles.set(hash, (async () => {
       const outDir = path.join(os.tmpdir(), `motion-remotion-bundle-${hash}`);
       if (existsSync(path.join(outDir, "index.html")) && existsSync(path.join(outDir, ".complete"))) return outDir;
       emit({ type: "progress", label: "Bundling", progress: 0.02 });
@@ -173,11 +184,11 @@ function getLocalBundle(bundler: BundlerMod, emit: Emit): Promise<string> {
       await writeFile(path.join(outDir, ".complete"), hash);
       return serveUrl;
     })().catch((e) => {
-      g.__motionBundle = undefined;
+      bundles.delete(hash);
       throw e;
-    });
+    }));
   }
-  return g.__motionBundle;
+  return bundles.get(hash)!;
 }
 
 /** One render at a time per process (each render already uses 2 browser tabs). */
@@ -192,14 +203,19 @@ function enqueue<T>(job: () => Promise<T>, emit: Emit): Promise<T> {
   return run;
 }
 
-export async function renderLocally(code: string, plan: RenderPlan, emit: Emit): Promise<RenderResult> {
+export async function renderLocally(
+  code: string,
+  plan: RenderPlan,
+  emit: Emit,
+  theme: MotionTheme = DEFAULT_MOTION_THEME,
+): Promise<RenderResult> {
   return enqueue(async () => {
     const { renderer, bundler } = await loadLocal();
     const serveUrl = await getLocalBundle(bundler, emit);
     const browserExecutable = process.env.CHROME_PATH || "/usr/bin/google-chrome";
     // Full Chrome (not chrome-headless-shell) needs the new headless mode.
     const chromeMode = "chrome-for-testing" as const;
-    const inputProps = { code };
+    const inputProps = { code, theme };
 
     emit({ type: "progress", label: "Starting browser", progress: 0.15 });
     const browser = await renderer.openBrowser("chrome", { browserExecutable, chromeMode, logLevel: "error" });
@@ -269,7 +285,7 @@ async function restoreSnapshot(): Promise<Sandbox | null> {
   return sandbox as Sandbox;
 }
 
-async function renderOnVercel(code: string, plan: RenderPlan, emit: Emit): Promise<RenderResult> {
+async function renderOnVercel(code: string, plan: RenderPlan, emit: Emit, theme: MotionTheme): Promise<RenderResult> {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   if (!blobToken) {
     throw new Error("BLOB_READ_WRITE_TOKEN is not set: connect a Vercel Blob store to this project to render motion.");
@@ -299,7 +315,7 @@ async function renderOnVercel(code: string, plan: RenderPlan, emit: Emit): Promi
     const { sandboxFilePath, contentType } = await v.renderMediaOnVercel({
       sandbox,
       compositionId: COMPOSITION_ID,
-      inputProps: { code },
+      inputProps: { code, theme },
       codec: plan.codec,
       outputFile: `/tmp/motion.${plan.ext}`,
       scale: plan.scale,

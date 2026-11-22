@@ -1,9 +1,10 @@
-// POST /api/render { code, output } → NDJSON JobEvent stream (progress…, then done | error).
+// POST /api/render { code, output, theme? } → NDJSON JobEvent stream (progress…, then done | error).
 import { requireAuth } from "@/lib/auth";
 import { ndjsonStream } from "@/lib/media";
 import { renderMotion } from "@/lib/render";
 import type { MotionOutput } from "@/lib/types";
 import { checkMotion } from "@/remotion/check";
+import { sanitizeTheme } from "@/remotion/theme";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
   } catch {
     return bad(400, "Body must be JSON: { code, output }");
   }
-  const { code, output } = (body ?? {}) as { code?: unknown; output?: unknown };
+  const { code, output, theme } = (body ?? {}) as { code?: unknown; output?: unknown; theme?: unknown };
   if (typeof code !== "string" || !code.trim()) return bad(400, "`code` must be a non-empty string");
   if (new TextEncoder().encode(code).length > MAX_CODE_BYTES) return bad(413, "`code` is larger than 100 KB");
   if (typeof output !== "string" || !OUTPUTS.includes(output as MotionOutput)) {
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
   }
 
   return ndjsonStream(async (emit) => {
-    const result = await renderMotion(code, output as MotionOutput, emit);
+    const result = await renderMotion(code, output as MotionOutput, emit, sanitizeTheme(theme));
     emit({ type: "done", url: result.url, width: result.width, height: result.height });
   });
 }

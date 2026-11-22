@@ -1,5 +1,6 @@
+import type { CSSProperties } from "react";
 import type { CodeData } from "@/lib/types";
-import { highlight } from "@/lib/highlight";
+import { highlightThemed } from "@/lib/highlight";
 import styles from "./render.module.css";
 
 function sourceLabel(s: NonNullable<CodeData["source"]>): string {
@@ -12,11 +13,13 @@ function safeUrl(u: string): string | null {
   return /^https?:\/\//i.test(u) ? u : null;
 }
 
-export async function CodeFigure({ data }: { data: CodeData }) {
-  const html = await highlight(data.code ?? "", data.language || "text");
+export async function CodeFigure({ data, theme }: { data: CodeData; theme?: string | null }) {
+  const { html, bg, fg } = await highlightThemed(data.code ?? "", data.language || "text", theme);
+  // The figure's own colours come from the shiki theme; the CSS falls back to the tokens.
+  const colors = { "--fig-bg": bg, "--fig-ink": fg } as CSSProperties;
   const url = data.source ? safeUrl(data.source.url) : null;
   return (
-    <figure className={styles.figure}>
+    <figure className={styles.figure} style={colors}>
       {data.filename ? <div className={styles.filename}>{data.filename}</div> : null}
       <div className={styles.code} dangerouslySetInnerHTML={{ __html: html }} />
       {data.source ? (

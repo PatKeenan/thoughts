@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import type { CodeData, DocNode, GenBlockAttrs, ImageData, MotionData, RepoData } from "@/lib/types";
+import { codeThemeOf } from "@/lib/look";
+import type { CodeData, Look, DocNode, GenBlockAttrs, ImageData, MotionData, RepoData } from "@/lib/types";
 import { CodeFigure } from "./CodeFigure";
 import { ImageFigure } from "./ImageFigure";
 import { MotionFigure } from "./MotionFigure";
@@ -52,37 +53,37 @@ function renderText(node: DocNode, key: number): ReactNode {
   return <FragmentKeyed key={key}>{out}</FragmentKeyed>;
 }
 
-function renderChildren(node: DocNode): ReactNode[] {
-  return (node.content ?? []).map((child, i) => renderNode(child, i));
+function renderChildren(node: DocNode, theme?: string): ReactNode[] {
+  return (node.content ?? []).map((child, i) => renderNode(child, i, theme));
 }
 
-function renderNode(node: DocNode, key: number): ReactNode {
+function renderNode(node: DocNode, key: number, theme?: string): ReactNode {
   switch (node.type) {
     case "text":
       return renderText(node, key);
     case "hardBreak":
       return <br key={key} />;
     case "paragraph":
-      return <p key={key}>{renderChildren(node)}</p>;
+      return <p key={key}>{renderChildren(node, theme)}</p>;
     case "heading": {
       const level = node.attrs?.level === 3 ? 3 : 2;
-      const kids = renderChildren(node);
+      const kids = renderChildren(node, theme);
       return level === 3 ? <h3 key={key}>{kids}</h3> : <h2 key={key}>{kids}</h2>;
     }
     case "bulletList":
-      return <ul key={key}>{renderChildren(node)}</ul>;
+      return <ul key={key}>{renderChildren(node, theme)}</ul>;
     case "orderedList":
-      return <ol key={key}>{renderChildren(node)}</ol>;
+      return <ol key={key}>{renderChildren(node, theme)}</ol>;
     case "listItem":
-      return <li key={key}>{renderChildren(node)}</li>;
+      return <li key={key}>{renderChildren(node, theme)}</li>;
     case "blockquote":
-      return <blockquote key={key}>{renderChildren(node)}</blockquote>;
+      return <blockquote key={key}>{renderChildren(node, theme)}</blockquote>;
     case "horizontalRule":
       return <hr key={key} className={styles.hr} />;
     case "codeBlock": {
       const lang = typeof node.attrs?.language === "string" ? node.attrs.language : "text";
       const code = (node.content ?? []).map((c) => c.text ?? "").join("");
-      return <CodeFigure key={key} data={{ language: lang || "text", code }} />;
+      return <CodeFigure key={key} data={{ language: lang || "text", code }} theme={theme} />;
     }
     case "genBlock": {
       // `history` is editor-only: pick out only what we need, never forward attrs wholesale.
@@ -93,6 +94,7 @@ function renderNode(node: DocNode, key: number): ReactNode {
         return (
           <CodeFigure
             key={key}
+            theme={theme}
             data={{
               language: data.language,
               code: data.code,
@@ -162,6 +164,8 @@ function FragmentKeyed({ children }: { children?: ReactNode }) {
  * Renders Tiptap JSON as React nodes (text goes through React, so it is escaped
  * by construction). Unknown nodes render nothing.
  */
-export async function Doc({ doc }: { doc: DocNode }) {
-  return <div className={styles.doc}>{renderChildren(doc)}</div>;
+export async function Doc({ doc, look }: { doc: DocNode; look?: Look | null }) {
+  // Code follows the look only through its code theme (a missing look keeps the default theme).
+  const theme = look ? codeThemeOf(look) : undefined;
+  return <div className={styles.doc}>{renderChildren(doc, theme)}</div>;
 }

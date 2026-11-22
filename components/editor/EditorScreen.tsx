@@ -7,27 +7,36 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import { api } from "@/lib/client/api";
 import { newBlockId } from "@/lib/client/studio";
-import type { DocNode, GenBlockAttrs, Post } from "@/lib/types";
+import type { DocNode, GenBlockAttrs, Look, Post } from "@/lib/types";
 import BuddyPanel from "@/components/buddy/BuddyPanel";
 import PublishSheet from "@/components/publish/PublishSheet";
 import Studio, { type StudioOpen, type StudioCommit } from "@/components/studio/Studio";
 import FactCheckSheet from "@/components/factcheck/FactCheckSheet";
+import LookSheet from "@/components/look/LookSheet";
 import { GenBlock, type GenOpenRequest } from "./GenBlock";
 import { Handler, SlashCommand, SlashController } from "./slash";
 import SlashMenu from "./SlashMenu";
 import Toolbar from "./Toolbar";
 import { insertGenBlock, scrollToBlock, updateGenBlock } from "./insert";
 import { readLocalDraft, useAutosave, type SaveState } from "./useAutosave";
+import { LookContext } from "./LookContext";
+import LookChip from "./LookChip";
+import { useLookState } from "./useLookState";
 import styles from "./EditorScreen.module.css";
 
 const EMPTY_DOC: DocNode = { type: "doc", content: [{ type: "paragraph" }] };
+const NO_POST = { title: "", text: "" };
 
 interface Loaded {
   post: Post;
   title: string;
   content: DocNode;
+  /** the post's own look (the local copy's, when it held an unsaved one) */
+  look: Look | null;
   /** local copy was newer than the server's: save it */
   restored: boolean;
+  /** the restored local copy carried an unsaved look */
+  lookRestored: boolean;
 }
 
 export default function EditorScreen({ id }: { id: string }) {
@@ -44,11 +53,14 @@ export default function EditorScreen({ id }: { id: string }) {
         const local = readLocalDraft(id);
         const newer =
           !!local && !local.synced && Date.parse(local.savedAt) > Date.parse(post.updatedAt || "0");
+        const lookRestored = newer && !!local && "look" in local;
         setLoaded({
           post,
           title: newer ? local!.title : post.title,
           content: newer ? local!.content : post.content?.type === "doc" ? post.content : EMPTY_DOC,
+          look: lookRestored ? (local!.look ?? null) : (post.look ?? null),
           restored: newer,
+          lookRestored,
         });
       })
       .catch((e: unknown) => {
@@ -103,6 +115,8 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
   const [buddyOpen, setBuddyOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [factOpen, setFactOpen] = useState(false);
+  const [lookOpen, setLookOpen] = useState(false);
+  const [lookPost, setLookPost] = useState(NO_POST);
 
   const { state: saveState, schedule, flush } = useAutosave(id, setPost);
 
@@ -137,7 +151,13 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
 
   // Local copy was newer than the server: push it.
   useEffect(() => {
-    if (initial.restored && editor) schedule({ title: initial.title, content: editor.getJSON() as DocNode });
+    if (initial.restored && editor) {
+      schedule({
+        title: initial.title,
+        content: editor.getJSON() as DocNode,
+        ...(initial.lookRestored ? { look: initial.look } : {}),
+      });
+    }
   }, [initial, editor, schedule]);
 
   // Bridges from editor extensions to React state.
@@ -177,6 +197,23 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
     [editor],
   );
 
+  // The look is saved with the next autosave (and retried with later ones until it sticks).
+  const persistLook = useCallback(
+    (look: Look | null) => {
+      if (editor) schedule({ title: titleRef.current, content: editor.getJSON() as DocNode, look });
+    },
+    [editor, schedule],
+  );
+  const lk = useLookState({ editor, initialLook: initial.look, persist: persistLook, getPostContext });
+  const { look, autoCapture } = lk;
+  const openLook = useCallback(() => {
+    setLookPost(getPostContext());
+    setLookOpen(true);
+  }, [getPostContext]);
+  useEffect(() => {
+    controller.look.set(openLook);
+  }, [controller, openLook]);
+
   const commit = (open: StudioOpen, result: StudioCommit) => {
       if (!editor) return;
       let pos: number | null = null;
@@ -189,6 +226,8 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
           ...result,
         };
         pos = insertGenBlock(editor, open.target.pos, attrs);
+        // The first image/animation in a post without a look sets it (in the background).
+        if (open.target.type === "new") autoCapture(attrs).catch(() => {});
       }
       setStudio(null);
       const at = pos;
@@ -202,85 +241,109 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
     post.status === "published" ? "Published" : post.status === "scheduled" ? "Scheduled" : "Publish";
 
   return (
-    <div className={styles.screen}>
-      <header className={styles.top}>
-        <div className={styles.topInner}>
-          <Link href="/write" className={styles.back} aria-label="Back to drafts">
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M15 5l-7 7 7 7" />
-            </svg>
-            Drafts
-          </Link>
-          <span className={`${styles.save} ${saveState === "offline" || saveState === "error" ? styles.saveWarn : ""}`} aria-live="polite">
-            {SAVE_LABEL[saveState]}
-          </span>
-          <button type="button" className={styles.ghost} onClick={() => setBuddyOpen(true)} disabled={!editor}>
-            Buddy
-          </button>
-          <button
-            type="button"
-            className={post.status === "draft" ? styles.primary : styles.ghost}
-            onClick={() => setPublishOpen(true)}
-            disabled={!editor}
-          >
-            {publishLabel}
-          </button>
-        </div>
-      </header>
+    <LookContext.Provider value={lk.ctx}>
+      <div className={styles.screen}>
+        <header className={styles.top}>
+          <div className={styles.topInner}>
+            <Link href="/write" className={styles.back} aria-label="Back to drafts">
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+              Drafts
+            </Link>
+            <span className={`${styles.save} ${saveState === "offline" || saveState === "error" ? styles.saveWarn : ""}`} aria-live="polite">
+              {SAVE_LABEL[saveState]}
+            </span>
+            <button type="button" className={styles.ghost} onClick={() => setBuddyOpen(true)} disabled={!editor}>
+              Buddy
+            </button>
+            <button
+              type="button"
+              className={post.status === "draft" ? styles.primary : styles.ghost}
+              onClick={() => setPublishOpen(true)}
+              disabled={!editor}
+            >
+              {publishLabel}
+            </button>
+          </div>
+        </header>
 
-      <main className={styles.column}>
-        <textarea
-          ref={titleEl}
-          className={styles.title}
-          value={title}
-          rows={1}
-          placeholder="Title"
-          aria-label="Title"
-          enterKeyHint="next"
-          onChange={(e) => onTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              editor?.commands.focus("start");
-            }
-          }}
-        />
-        <EditorContent editor={editor} className={styles.body} />
-      </main>
-
-      {editor && <Toolbar editor={editor} onCheck={() => setFactOpen(true)} />}
-      <SlashMenu controller={controller} />
-
-      {editor && studio && (
-        <Studio
-          key={studio.key}
-          open={studio}
-          onClose={() => {
-            setStudio(null);
-            if (studio.target.type === "new") {
-              requestAnimationFrame(() => editor.commands.focus(studio.target.pos, { scrollIntoView: true }));
-            }
-          }}
-          onCommit={(r) => commit(studio, r)}
-          getPostContext={getPostContext}
-        />
-      )}
-
-      {editor && (
-        <>
-          <FactCheckSheet open={factOpen} onClose={() => setFactOpen(false)} editor={editor} title={title} />
-          <BuddyPanel open={buddyOpen} onClose={() => setBuddyOpen(false)} editor={editor} title={title} />
-          <PublishSheet
-            open={publishOpen}
-            onClose={() => setPublishOpen(false)}
-            post={{ ...post, title }}
-            onChange={setPost}
-            getText={() => editor.getText()}
-            flush={flush}
+        <main className={styles.column}>
+          <textarea
+            ref={titleEl}
+            className={styles.title}
+            value={title}
+            rows={1}
+            placeholder="Title"
+            aria-label="Title"
+            enterKeyHint="next"
+            onChange={(e) => onTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                editor?.commands.focus("start");
+              }
+            }}
           />
-        </>
-      )}
-    </div>
+          <LookChip
+            look={look}
+            inherited={lk.inherited}
+            offLook={lk.offLook}
+            restyling={!!lk.restyle}
+            notice={lk.notice}
+            onOpen={openLook}
+            onDismissNotice={lk.dismissNotice}
+          />
+          <EditorContent editor={editor} className={styles.body} />
+        </main>
+
+        {editor && <Toolbar editor={editor} onCheck={() => setFactOpen(true)} />}
+        <SlashMenu controller={controller} />
+
+        {editor && studio && (
+          <Studio
+            key={studio.key}
+            open={studio}
+            onClose={() => {
+              setStudio(null);
+              if (studio.target.type === "new") {
+                requestAnimationFrame(() => editor.commands.focus(studio.target.pos, { scrollIntoView: true }));
+              }
+            }}
+            onCommit={(r) => commit(studio, r)}
+            getPostContext={getPostContext}
+            look={look}
+          />
+        )}
+
+        {editor && (
+          <>
+            <FactCheckSheet open={factOpen} onClose={() => setFactOpen(false)} editor={editor} title={title} />
+            <BuddyPanel open={buddyOpen} onClose={() => setBuddyOpen(false)} editor={editor} title={title} />
+            <PublishSheet
+              open={publishOpen}
+              onClose={() => setPublishOpen(false)}
+              post={{ ...post, title, look: lk.inherited ? null : look }}
+              onChange={setPost}
+              getText={() => editor.getText()}
+              flush={flush}
+            />
+            <LookSheet
+              open={lookOpen}
+              onClose={() => setLookOpen(false)}
+              look={look}
+              inherited={lk.inherited}
+              onChange={lk.setLook}
+              offLook={lk.offLook}
+              restyle={lk.restyle}
+              onRestyleAll={lk.restyleAll}
+              onCancelRestyle={lk.cancelRestyleAll}
+              post={lookPost}
+            />
+          </>
+        )}
+      </div>
+    </LookContext.Provider>
   );
 }
 

@@ -1,4 +1,5 @@
 import { requireAuth } from "@/lib/auth";
+import { validateLook } from "@/lib/look";
 import { chatStream, errorResponse, jsonError, readJson, type ORMessage } from "@/lib/openrouter";
 import { MOCK_MOTION, motionContext, studioContext, truncate, type StudioFile } from "@/lib/prompts";
 import type { ChatMessage, CodeData } from "@/lib/types";
@@ -84,6 +85,9 @@ export async function POST(request: Request) {
     const p = body.post as { title?: unknown; text?: unknown } | undefined;
     const post = p ? { title: String(p.title ?? ""), text: String(p.text ?? "") } : undefined;
 
+    // Only motion uses the look (pace/mood/feel); colours come from the theme prop. Invalid looks are ignored.
+    const look = motion && body.look ? validateLook(body.look) : null;
+
     const headers = {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store, no-transform",
@@ -97,7 +101,7 @@ export async function POST(request: Request) {
     const system: ORMessage = {
       role: "system",
       content: motion
-        ? motionContext({ post, current: current && current.code.trim() ? { code: current.code } : undefined })
+        ? motionContext({ post, look, current: current && current.code.trim() ? { code: current.code } : undefined })
         : studioContext({ post, files, current }),
     };
     const stream = await chatStream({

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "@/lib/auth";
+import { lookToPrompt, validateLook } from "@/lib/look";
 import { MAX_VIDEO_BYTES, ndjsonStream, putMedia, putMediaStream } from "@/lib/media";
 import { modelFor } from "@/lib/models";
 import {
@@ -79,8 +80,11 @@ export async function POST(request: Request) {
   if (denied) return denied;
   try {
     const body = await readJson(request);
-    const prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 4000) : "";
-    if (!prompt) return jsonError(400, "prompt is required");
+    const userPrompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 4000) : "";
+    if (!userPrompt) return jsonError(400, "prompt is required");
+    // An invalid look is ignored. The look description is appended to what the model gets.
+    const look = body.look ? validateLook(body.look) : null;
+    const prompt = look ? `${userPrompt}\n\nVisual style to match (style only, not subject matter):\n${lookToPrompt(look)}` : userPrompt;
     const aspect = body.aspect as Aspect;
     if (!ASPECTS.includes(aspect)) return jsonError(400, "aspect must be one of 16:9, 1:1, 4:5, 3:2");
     const seconds = Math.min(30, Math.max(1, Math.round(Number(body.seconds) || 5)));
