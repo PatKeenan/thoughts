@@ -4,17 +4,19 @@ import type { FontKind, Look, LookStamp, MotionTheme } from "@/lib/types";
 
 /** Shiki themes a look may use for code. First dark, then light. */
 export const CODE_THEMES = [
+  "dracula",
+  "night-owl",
+  "tokyo-night",
   "vitesse-dark",
   "github-dark",
   "one-dark-pro",
   "nord",
-  "night-owl",
   "vitesse-light",
   "github-light",
   "solarized-light",
 ] as const;
 export type CodeTheme = (typeof CODE_THEMES)[number];
-export const DEFAULT_CODE_THEME: CodeTheme = "vitesse-dark";
+export const DEFAULT_CODE_THEME: CodeTheme = "dracula";
 
 export function codeThemeOf(look: Look | null | undefined): CodeTheme {
   const t = look?.codeTheme;
@@ -29,11 +31,11 @@ export const FONT_STACKS: Record<FontKind, string> = {
 
 /** The blog's own palette: what animations use when a post has no look. */
 export const DEFAULT_MOTION_THEME: MotionTheme = {
-  bg: "#f5efe4",
-  ink: "#1b1712",
-  accent: "#d63f1c",
-  muted: "#d6ccb9",
-  extra: [],
+  bg: "#f5f8f7",
+  ink: "#042f2e",
+  accent: "#0f766e",
+  muted: "#cddbd8",
+  extra: ["#db2777"],
   titleFont: FONT_STACKS.serif,
   bodyFont: FONT_STACKS.serif,
   monoFont: FONT_STACKS.mono,

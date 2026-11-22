@@ -1,18 +1,22 @@
-/* Design tokens — shared by the public site and the editor. Owned by the lead; do not edit.
-   Direction: a printed pamphlet. Warm paper, near-black ink, one vermilion accent,
-   hairline rules instead of cards and shadows. Serif for reading, grotesk for controls. */
+/* Design tokens — shared by the public site and the editor.
+   Direction: an editorial journal with a personal signature. A cool, barely-there
+   off-white page; text in the darkest teal instead of black; teal for structure
+   (links, primary actions) and pink for the sparks (marks, selection, pull rules).
+   Light only, by choice: the expression lives in the accents and in the code
+   blocks (Dracula), not in a dark developer skin. Hairline rules, no cards or shadows. */
 :root {
-  --paper: #f5efe4;
-  --paper-2: #ece4d5; /* raised / inset surfaces */
-  --ink: #1b1712;
-  --ink-2: #5d554a; /* secondary text */
-  --ink-3: #8f8677; /* tertiary, placeholders */
-  --rule: #d6ccb9; /* hairlines */
-  --accent: #d63f1c; /* vermilion */
-  --accent-ink: #fff8ef;
-  --ok: #2f6b3f;
-  --code-bg: #1b1712;
-  --code-ink: #efe7d8;
+  --paper: #f5f8f7; /* subtle cool off-white */
+  --paper-2: #e8efed; /* raised / inset surfaces */
+  --ink: #042f2e; /* teal 950 */
+  --ink-2: #3b5b59; /* secondary text */
+  --ink-3: #7b9492; /* tertiary, placeholders */
+  --rule: #cddbd8; /* hairlines */
+  --accent: #0f766e; /* teal 700 — links, primary actions */
+  --accent-2: #db2777; /* pink 600 — marks, selection, pull rules */
+  --accent-ink: #f5f8f7;
+  --ok: #15803d;
+  --code-bg: #282a36; /* Dracula */
+  --code-ink: #f8f8f2;
 
   --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
   --font-body: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
@@ -28,22 +32,6 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #16130f;
-    --paper-2: #211d17;
-    --ink: #efe7d8;
-    --ink-2: #b0a696;
-    --ink-3: #7b7265;
-    --rule: #352f26;
-    --accent: #f0623c;
-    --accent-ink: #16130f;
-    --ok: #7fbf8f;
-    --code-bg: #0e0c09;
-    --code-ink: #efe7d8;
-  }
-}
-
 *,
 *::before,
 *::after {
@@ -52,7 +40,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
@@ -81,7 +69,7 @@ select {
 }
 
 ::selection {
-  background: var(--accent);
+  background: var(--accent-2);
   color: var(--accent-ink);
 }
 

@@ -101,7 +101,7 @@ function Scrub({ player, entry }: { player: PlayerRef | null; entry: Entry }) {
         style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 14, cursor: "pointer", touchAction: "none" }}
       >
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 3, background: "rgba(0,0,0,.18)" }}>
-          <div style={{ height: "100%", width: `${(frame / Math.max(1, total - 1)) * 100}%`, background: "#d6452b" }} />
+          <div style={{ height: "100%", width: `${(frame / Math.max(1, total - 1)) * 100}%`, background: "#db2777" }} />
         </div>
       </div>
     </>

@@ -1,8 +1,9 @@
 // Client-side syntax highlighting. shiki is loaded lazily (dynamic import) with the
 // JavaScript regex engine (no wasm), and grammars are loaded one by one on demand.
 import type { Highlighter } from "shiki";
+import { DEFAULT_CODE_THEME } from "@/lib/look";
 
-const THEME = "vitesse-dark"; // default; matches lib/highlight.ts (server render)
+const THEME: string = DEFAULT_CODE_THEME; // matches lib/highlight.ts (server render)
 
 let highlighter: Promise<Highlighter> | null = null;
 const themeLoads = new Map<string, Promise<boolean>>();

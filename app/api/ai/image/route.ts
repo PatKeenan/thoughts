@@ -20,10 +20,10 @@ const ASPECTS: Aspect[] = ["16:9", "1:1", "4:5", "3:2"];
 
 function mockSvg(prompt: string, aspect: Aspect, look: Look | null): string {
   // With a look, draw with its palette so the look is visible in a browser test.
-  const bg = look?.palette.bg ?? "#f5efe4";
-  const ink = look?.palette.ink ?? "#1b1712";
-  const accent = look?.palette.accent ?? "#d63f1c";
-  const muted = look?.palette.muted ?? "#d6ccb9";
+  const bg = look?.palette.bg ?? "#f5f8f7";
+  const ink = look?.palette.ink ?? "#042f2e";
+  const accent = look?.palette.accent ?? "#0f766e";
+  const muted = look?.palette.muted ?? "#cddbd8";
   const [aw, ah] = aspect.split(":").map(Number);
   const w = 1200;
   const h = Math.round((w * ah) / aw);

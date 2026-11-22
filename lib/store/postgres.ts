@@ -155,7 +155,7 @@ export function createPostgresStore(url: string): Store {
     async getSettings() {
       const rows = await q(`select value from settings where key = 'site'`);
       const stored = (rows[0]?.value ?? {}) as Partial<Settings>;
-      return { ...DEFAULT_SETTINGS, ...stored, defaultLook: stored.defaultLook ?? null, savedLooks: Array.isArray(stored.savedLooks) ? stored.savedLooks : [] };
+      return { ...DEFAULT_SETTINGS, ...stored, defaultLook: stored.defaultLook === undefined ? DEFAULT_SETTINGS.defaultLook : stored.defaultLook, savedLooks: Array.isArray(stored.savedLooks) ? stored.savedLooks : [] };
     },
 
     async updateSettings(patch) {

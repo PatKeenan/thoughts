@@ -7,8 +7,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 FONT = ROOT / "node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff"
-PAPER = (245, 239, 228)
-VERMILION = (214, 63, 28)
+PAPER = (245, 248, 247)
+VERMILION = (219, 39, 119)  # pink mark (name kept from the first palette)
 SS = 4  # supersample
 
 

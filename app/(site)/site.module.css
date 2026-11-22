@@ -19,6 +19,25 @@
   padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--rule);
   margin-bottom: 2.5rem;
+  position: relative;
+}
+/* The signature: a short pink tab and a teal one sitting on the masthead rule. */
+.masthead::before,
+.masthead::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  height: 3px;
+}
+.masthead::before {
+  left: 0;
+  width: 2.75rem;
+  background: var(--accent-2);
+}
+.masthead::after {
+  left: 2.75rem;
+  width: 1.1rem;
+  background: var(--accent);
 }
 .title {
   display: inline-block;
@@ -92,7 +111,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-2);
+  color: var(--accent);
   padding-top: 0.55rem;
 }
 .entryTitle {
@@ -126,7 +145,7 @@
 }
 .empty::before {
   content: "\00b6\00a0";
-  color: var(--accent);
+  color: var(--accent-2);
 }
 @media (min-width: 48rem) {
   .shell {
@@ -177,7 +196,7 @@
 }
 .meta::before {
   content: "\00b6\00a0";
-  color: var(--accent);
+  color: var(--accent-2);
   font-family: var(--font-display);
   font-size: 1.1rem;
   letter-spacing: 0;

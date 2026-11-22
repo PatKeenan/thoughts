@@ -20,7 +20,8 @@ function normSettings(s: Partial<Settings>): Settings {
   return {
     ...DEFAULT_SETTINGS,
     ...s,
-    defaultLook: s.defaultLook ?? null,
+    // never set → the built-in house look; explicitly removed (null) stays removed
+    defaultLook: s.defaultLook === undefined ? DEFAULT_SETTINGS.defaultLook : s.defaultLook,
     savedLooks: Array.isArray(s.savedLooks) ? s.savedLooks : [],
   };
 }
