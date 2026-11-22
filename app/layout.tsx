@@ -10,6 +10,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Blog",
   appleWebApp: { capable: true, title: "Write", statusBarStyle: "default" },
+  icons: { apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

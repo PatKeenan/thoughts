@@ -1,0 +1,35 @@
+.card {
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  padding: 0.75rem 0 0.8rem;
+}
+
+.kicker,
+.meta {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.name {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  line-height: 1.15;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.owner {
+  color: var(--ink-2);
+}
+
+.desc {
+  margin: 0.35rem 0 0.45rem;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--ink);
+}

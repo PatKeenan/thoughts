@@ -1,0 +1,109 @@
+.figure {
+  margin: 0;
+  border: 1px solid var(--code-bg);
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--code-ink) 14%, transparent);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--code-ink) 70%, transparent);
+}
+
+.filename {
+  font-family: var(--font-mono);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  color: var(--code-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.lang {
+  flex: none;
+}
+
+.box {
+  position: relative;
+}
+
+.collapsed {
+  max-height: 22rem;
+  overflow: hidden;
+}
+
+.fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3.5rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--code-bg));
+}
+
+.code :global(pre) {
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  overflow-x: auto;
+  background: transparent !important;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  tab-size: 2;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code :global(pre code) {
+  font-family: inherit;
+  white-space: pre;
+}
+
+.more {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--code-ink) 14%, transparent);
+  background: transparent;
+  color: var(--code-ink);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.caption {
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--code-ink) 75%, transparent);
+}
+
+.source {
+  display: block;
+  padding: 0.45rem 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--code-ink) 14%, transparent);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--code-ink) 75%, transparent);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

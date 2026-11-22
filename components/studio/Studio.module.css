@@ -1,0 +1,539 @@
+.root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  font-family: var(--font-ui);
+  animation: up 200ms var(--ease);
+}
+
+@keyframes up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+/* ---- header ------------------------------------------------------------- */
+
+.header {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  padding: var(--safe-top) 0.75rem 0;
+  min-height: calc(52px + var(--safe-top));
+  border-bottom: 1px solid var(--ink);
+}
+
+.headerBtn {
+  justify-self: start;
+  min-height: var(--tap);
+  padding: 0 0.25rem;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.3rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.commit {
+  justify-self: end;
+  min-height: 34px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 160ms var(--ease);
+}
+
+.commit:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ---- scroll area ---------------------------------------------------------- */
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll > * {
+  max-width: calc(var(--measure) + 2rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.preview {
+  padding: 1rem 1rem 0.5rem;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 40px;
+  padding: 0 0.1rem 0.35rem;
+}
+
+.hidden {
+  visibility: hidden;
+}
+
+.filename,
+.filenameBtn {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filenameBtn {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dashed var(--rule);
+  background: transparent;
+  text-align: left;
+  cursor: text;
+}
+
+.filenameInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--accent);
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  outline: none;
+}
+
+.langSelect {
+  flex: none;
+  min-height: 36px;
+  max-width: 45%;
+  padding: 0 1.2rem 0 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238f8677' stroke-width='1.4'/%3E%3C/svg%3E")
+    no-repeat right 0.45rem center;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  color: var(--ink);
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.writing {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.codeFrame {
+  background: var(--code-bg);
+  color: var(--code-ink);
+  border-radius: var(--radius);
+  min-height: 6rem;
+  max-height: 60dvh;
+  overflow: auto;
+}
+
+.codeFrame :global(pre) {
+  margin: 0;
+  padding: 0.9rem;
+  overflow: visible;
+  background: transparent !important;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.codeFrame :global(pre code) {
+  font-family: inherit;
+  white-space: pre;
+}
+
+.hand {
+  display: block;
+  width: 100%;
+  min-height: 14rem;
+  max-height: 60dvh;
+  padding: 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: var(--code-ink);
+  caret-color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 16px; /* iOS zooms inputs under 16px */
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+  resize: vertical;
+  outline: none;
+}
+
+.source {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: var(--tap);
+}
+
+.textBtn {
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 0.3em;
+  cursor: pointer;
+}
+
+.textBtn:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.on {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+}
+
+.stepBtn {
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.stepBtn:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.stepLabel {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  padding: 1.5rem 0 0.5rem;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.empty p {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+  margin-top: 0.5rem;
+}
+
+/* ---- thread ---------------------------------------------------------------- */
+
+.thread {
+  padding: 0.25rem 1rem 0.5rem;
+}
+
+.user,
+.assistant,
+.errorRow {
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.msg {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.user .msg {
+  color: var(--ink);
+}
+
+.assistant .msg {
+  color: var(--ink-2);
+}
+
+.pending {
+  font-style: italic;
+}
+
+.chip {
+  min-height: 24px;
+  padding: 0 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  cursor: pointer;
+  position: relative;
+}
+
+.chip::after {
+  content: "";
+  position: absolute;
+  inset: -10px -6px;
+}
+
+.chipOn {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.errorRow .msg {
+  color: var(--accent);
+}
+
+.errorActions {
+  display: flex;
+  gap: 1.25rem;
+}
+
+/* ---- context ---------------------------------------------------------------- */
+
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem 1rem;
+}
+
+.ctxChip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 32px;
+  padding-left: 0.55rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  font-size: 0.78rem;
+}
+
+.ctxLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.ctxRemove {
+  flex: none;
+  width: 34px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.attach {
+  min-height: 32px;
+  padding: 0 0.6rem;
+  border: 1px dashed var(--ink-3);
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+/* ---- composer --------------------------------------------------------------- */
+
+.composer {
+  flex: none;
+  border-top: 1px solid var(--ink);
+  background: var(--paper);
+  padding: 0 0.75rem calc(0.5rem + var(--safe-bottom));
+}
+
+.composer > * {
+  max-width: calc(var(--measure) + 0.5rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.quick {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 0 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.quickChip {
+  flex: none;
+  min-height: 32px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.form {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap);
+  max-height: 140px;
+  padding: 0.6rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+  resize: none;
+  outline: none;
+  caret-color: var(--accent);
+}
+
+.input:focus {
+  border-bottom-color: var(--ink);
+}
+
+.send,
+.stop {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 1rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.send:disabled {
+  background: transparent;
+  color: var(--ink-3);
+  border-color: var(--rule);
+  cursor: default;
+}
+
+.stop {
+  background: transparent;
+  color: var(--ink);
+}

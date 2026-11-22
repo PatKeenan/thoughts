@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Blog
 
-## Getting Started
+A personal blog with a phone-first writing app you add to your Home Screen.
 
-First, run the development server:
+- **Site** — `/` and `/posts/<slug>`, RSS at `/feed.xml`.
+- **Write** — `/write` (password). Type `/` in a post for tools:
+  - `/code` — generate or paste a snippet, refine it by chat in a full-screen studio, then **Add inline**. Reopen any block later to edit or regenerate.
+  - `/github` — search your repos, browse files, pick lines as a snippet, attach files as context for the AI, or insert a repo card.
+- **Buddy** — line-edits (Polish) and structural notes (Structure) that follow your voice: it learns from your published posts and the voice notes in Settings. You accept or skip each change.
+- **Publish** — now or scheduled. Scheduled posts go live on their own at the set time (within a minute).
+
+## Deploy (Vercel)
+
+1. Import this repo in Vercel.
+2. Storage → add **Neon** Postgres (sets `DATABASE_URL`). Tables are created on first use.
+3. Add env vars from `.env.example`: `ADMIN_PASSWORD`, `SESSION_SECRET`, `OPENROUTER_API_KEY`, optionally `GITHUB_TOKEN`.
+4. Deploy. Open `https://<your-site>/write` on your phone → Share → **Add to Home Screen**.
+5. In the app: Settings → site title, your name, voice notes.
+
+## Local
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local   # set ADMIN_PASSWORD and SESSION_SECRET; AI_MOCK=1 works without keys
+npm install && npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Without `DATABASE_URL`, posts are kept in `.data/db.json` (local only).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Models
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+All AI goes through OpenRouter, one model per job, set in `lib/models.ts` and overridable with `MODEL_<JOB>` env vars.
 
-## Learn More
+| Job | Default |
+|---|---|
+| code snippets | `anthropic/claude-sonnet-5.5` |
+| writing buddy | `anthropic/claude-opus-5.5` |
+| titles, excerpts, slugs | `deepseek/deepseek-v4.1-flash` |
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Reserved for the next phase: fact-check (`:online` web search), image, motion.

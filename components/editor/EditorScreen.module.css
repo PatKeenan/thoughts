@@ -1,0 +1,255 @@
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- top bar ---------------------------------------------------------- */
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding-top: var(--safe-top);
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-ui);
+}
+
+.topInner {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: calc(var(--measure) + 2.5rem);
+  margin: 0 auto;
+  padding: 0 0.75rem;
+  min-height: 52px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: var(--tap);
+  padding-right: 0.5rem;
+  margin-left: -0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.save {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saveWarn {
+  color: var(--ink-2);
+}
+
+.ghost,
+.primary {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 0.8rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  /* keep a 44px hit area around the 34px visual */
+  position: relative;
+}
+
+.ghost::after,
+.primary::after {
+  content: "";
+  position: absolute;
+  inset: -5px -2px;
+}
+
+.ghost {
+  border-color: var(--rule);
+}
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ghost:disabled,
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- writing column --------------------------------------------------- */
+
+.column {
+  flex: 1;
+  width: 100%;
+  max-width: calc(var(--measure) + 2.5rem);
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem 40vh;
+}
+
+.title {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  font-family: var(--font-display);
+  font-size: 2.3rem;
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  caret-color: var(--accent);
+}
+
+.title::placeholder {
+  color: var(--ink-3);
+}
+
+.body {
+  font-family: var(--font-body);
+  font-size: 1.125rem;
+  line-height: 1.65;
+}
+
+.prose {
+  outline: none;
+  min-height: 40vh;
+  caret-color: var(--accent);
+  overflow-wrap: break-word;
+}
+
+.prose > * + * {
+  margin-top: 0.9em;
+}
+
+.prose :global(p) {
+  margin: 0;
+}
+
+.prose > :global(p) + :global(p) {
+  margin-top: 0.85em;
+}
+
+.prose :global(h2),
+.prose :global(h3) {
+  margin: 1.6em 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.prose :global(h2) {
+  font-size: 1.75rem;
+}
+
+.prose :global(h3) {
+  font-size: 1.35rem;
+}
+
+.prose :global(ul),
+.prose :global(ol) {
+  margin: 0.9em 0 0;
+  padding-left: 1.3em;
+}
+
+.prose :global(li) + :global(li) {
+  margin-top: 0.25em;
+}
+
+.prose :global(li p) {
+  margin: 0;
+}
+
+.prose :global(blockquote) {
+  margin: 1em 0 0;
+  padding-left: 1rem;
+  border-left: 1px solid var(--ink);
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.prose :global(hr) {
+  margin: 2em 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.prose :global(hr.ProseMirror-selectednode) {
+  border-top-color: var(--accent);
+}
+
+.prose :global(code):not(:global(pre code)):not(:global([data-node-view-wrapper] code)) {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 0.05em 0.25em;
+  background: var(--paper-2);
+  border-radius: var(--radius);
+}
+
+.prose :global(a) {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+}
+
+/* Placeholder (Tiptap adds data-placeholder + .is-empty to the current empty node) */
+.prose :global(p.is-empty)::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--ink-3);
+}
+
+/* The "/query" being typed */
+.prose :global(.suggestion) {
+  color: var(--accent);
+}
+
+/* ---- loading / error -------------------------------------------------- */
+
+.status {
+  min-height: 60dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 1.25rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.statusActions {
+  display: flex;
+  gap: 0.75rem;
+}

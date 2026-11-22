@@ -1,0 +1,231 @@
+// Thin OpenRouter client: chat() for one-shot replies, chatStream() for plain-text deltas.
+import { modelFor, type Job } from "@/lib/models";
+
+export interface ORMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface ORRequest {
+  job: Job;
+  messages: ORMessage[];
+  signal?: AbortSignal;
+  temperature?: number;
+  maxTokens?: number;
+  /** Ask for a JSON object response (best effort; callers still parse defensively). */
+  json?: boolean;
+}
+
+/** An error that already carries an HTTP status and a message fit for the client. */
+export class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+
+function headers(): Record<string, string> {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new HttpError(500, "OPENROUTER_API_KEY is not set");
+  return {
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+    "HTTP-Referer": process.env.SITE_URL || "https://localhost",
+    "X-OpenRouter-Title": "Write",
+  };
+}
+
+function body(req: ORRequest, stream: boolean): string {
+  return JSON.stringify({
+    model: modelFor(req.job),
+    messages: req.messages,
+    stream,
+    ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+    ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
+    ...(req.json ? { response_format: { type: "json_object" } } : {}),
+  });
+}
+
+async function upstreamError(res: Response): Promise<HttpError> {
+  let detail = "";
+  try {
+    const text = await res.text();
+    try {
+      const j = JSON.parse(text);
+      detail = j?.error?.message || j?.message || "";
+    } catch {
+      detail = text.slice(0, 200);
+    }
+  } catch {
+    /* ignore */
+  }
+  const base =
+    res.status === 401
+      ? "OpenRouter rejected the API key"
+      : res.status === 402
+        ? "OpenRouter account is out of credit"
+        : res.status === 429
+          ? "OpenRouter rate limit hit, try again shortly"
+          : `OpenRouter error ${res.status}`;
+  return new HttpError(res.status, detail ? `${base}: ${detail}` : base);
+}
+
+async function post(req: ORRequest, stream: boolean): Promise<Response> {
+  const h = headers();
+  let res: Response;
+  try {
+    res = await fetch(ENDPOINT, { method: "POST", headers: h, body: body(req, stream), signal: req.signal });
+  } catch (e) {
+    if (req.signal?.aborted) throw e;
+    throw new HttpError(502, "Could not reach OpenRouter");
+  }
+  if (!res.ok) throw await upstreamError(res);
+  return res;
+}
+
+/** One-shot completion; resolves to the assistant text. */
+export async function chat(req: ORRequest): Promise<string> {
+  const res = await post(req, false);
+  const j = await res.json().catch(() => null);
+  const content = j?.choices?.[0]?.message?.content;
+  if (j?.error) throw new HttpError(502, `OpenRouter error: ${j.error.message ?? "unknown"}`);
+  if (typeof content !== "string") throw new HttpError(502, "OpenRouter returned no content");
+  return content;
+}
+
+/**
+ * Turns an OpenRouter SSE body into a stream of plain-text deltas (UTF-8).
+ * Handles chunks split anywhere, comment lines (": ..."), and "data: [DONE]".
+ */
+export function sseToTextStream(
+  upstream: ReadableStream<Uint8Array>,
+  onCancel?: () => void,
+): ReadableStream<Uint8Array> {
+  const reader = upstream.getReader();
+  const dec = new TextDecoder();
+  const enc = new TextEncoder();
+  let buf = "";
+  let done = false;
+
+  // Returns deltas found in complete lines; sets `done` on [DONE].
+  function drain(flush: boolean): string[] {
+    const out: string[] = [];
+    const lines = buf.split(/\r?\n/);
+    buf = flush ? "" : (lines.pop() ?? "");
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue; // comments, blank lines, event:/id:
+      const payload = line.slice(5).trim();
+      if (!payload) continue;
+      if (payload === "[DONE]") {
+        done = true;
+        break;
+      }
+      let j: { choices?: { delta?: { content?: unknown } }[]; error?: { message?: string } };
+      try {
+        j = JSON.parse(payload);
+      } catch {
+        continue;
+      }
+      if (j.error) throw new HttpError(502, `OpenRouter error: ${j.error.message ?? "unknown"}`);
+      const c = j.choices?.[0]?.delta?.content;
+      if (typeof c === "string" && c) out.push(c);
+    }
+    return out;
+  }
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        while (true) {
+          if (done) {
+            controller.close();
+            reader.cancel().catch(() => {});
+            return;
+          }
+          const { value, done: eof } = await reader.read();
+          if (eof) {
+            buf += dec.decode();
+            const deltas = drain(true);
+            for (const d of deltas) controller.enqueue(enc.encode(d));
+            controller.close();
+            return;
+          }
+          buf += dec.decode(value, { stream: true });
+          const deltas = drain(false);
+          if (deltas.length) {
+            for (const d of deltas) controller.enqueue(enc.encode(d));
+            return;
+          }
+        }
+      } catch (e) {
+        controller.error(e);
+      }
+    },
+    cancel(reason) {
+      onCancel?.();
+      return reader.cancel(reason);
+    },
+  });
+}
+
+/**
+ * Starts a streaming completion. Resolves once upstream has accepted the request
+ * (so auth/credit errors surface as HttpError before any bytes are sent), then
+ * yields plain-text deltas. Aborting `signal` cancels the upstream request.
+ */
+export async function chatStream(req: ORRequest): Promise<ReadableStream<Uint8Array>> {
+  const res = await post(req, true);
+  if (!res.body) throw new HttpError(502, "OpenRouter returned an empty stream");
+  return sseToTextStream(res.body);
+}
+
+// ---- shared route helpers ---------------------------------------------------
+
+export function jsonError(status: number, message: string): Response {
+  return Response.json({ error: message }, { status });
+}
+
+export function errorResponse(e: unknown): Response {
+  if (e instanceof HttpError) return jsonError(e.status, e.message);
+  console.error(e);
+  return jsonError(500, e instanceof Error ? e.message : "Unexpected error");
+}
+
+export const MAX_BODY = 400_000;
+
+/** Reads a JSON object body, rejecting anything over `max` bytes with 413. */
+export async function readJson(request: Request, max = MAX_BODY): Promise<Record<string, unknown>> {
+  const len = Number(request.headers.get("content-length") || 0);
+  if (len > max) throw new HttpError(413, "Request body too large");
+  const text = await request.text();
+  if (text.length > max) throw new HttpError(413, "Request body too large");
+  try {
+    const j = JSON.parse(text);
+    if (j && typeof j === "object" && !Array.isArray(j)) return j as Record<string, unknown>;
+  } catch {
+    /* fall through */
+  }
+  throw new HttpError(400, "Invalid JSON body");
+}
+
+/** Pulls the outermost {...} object out of model text (strips fences and prose). */
+export function parseJsonObject(text: string): unknown | null {
+  const t = text.trim();
+  const fence = t.match(/```(?:json)?\s*\n([\s\S]*?)\n?```/i);
+  const candidates = [fence?.[1], t];
+  for (const c of candidates) {
+    if (!c) continue;
+    const a = c.indexOf("{");
+    const b = c.lastIndexOf("}");
+    if (a === -1 || b <= a) continue;
+    try {
+      return JSON.parse(c.slice(a, b + 1));
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
