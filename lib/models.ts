@@ -1,5 +1,5 @@
 // One model per job, routed through OpenRouter. Override any of them with env vars.
-export type Job = "code" | "writing" | "fast" | "factcheck" | "image" | "motion" | "video";
+export type Job = "code" | "writing" | "fast" | "factcheck" | "image" | "motion" | "video" | "look";
 
 // Defaults checked against the OpenRouter catalogue on 2026-11-22.
 const DEFAULTS: Record<Job, string> = {
@@ -9,6 +9,7 @@ const DEFAULTS: Record<Job, string> = {
   factcheck: "anthropic/claude-sonnet-5.5:online", // ":online" = web search plugin
   image: "google/gemini-3.1-flash-image", // POST /api/v1/images
   motion: "anthropic/claude-sonnet-5.5", // writes Remotion compositions
+  look: "anthropic/claude-sonnet-5.5", // reads an image or animation and extracts its style (needs vision)
   video: "google/veo-3.1-fast", // AI video clips (POST /api/v1/videos); list: GET /api/v1/videos/models
 };
 

@@ -20,6 +20,8 @@ export interface Post {
   status: PostStatus;
   /** ISO string. Set when status is "scheduled" (future) or "published" (time it went live). */
   publishAt: string | null;
+  /** The post's visual look (see lib/look.ts). null → falls back to settings.defaultLook. */
+  look: Look | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -35,6 +37,10 @@ export interface Settings {
   voiceNotes: string;
   /** Canonical site URL (no trailing slash), used for RSS/OG. May be "". */
   siteUrl: string;
+  /** Look used by posts that have none of their own. */
+  defaultLook: Look | null;
+  /** Named looks saved for reuse across posts (max 20). */
+  savedLooks: Look[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,6 +50,8 @@ export const DEFAULT_SETTINGS: Settings = {
   bio: "",
   voiceNotes: "",
   siteUrl: "",
+  defaultLook: null,
+  savedLooks: [],
 };
 
 export interface ChatMessage {
@@ -71,6 +79,45 @@ export interface CodeData {
   filename?: string;
   caption?: string;
   source?: CodeSource; // present when the snippet came from GitHub
+}
+
+// ---- Look: a post's shared visual style -------------------------------------
+
+export type FontKind = "serif" | "sans" | "mono";
+
+export interface Look {
+  id: string;
+  /** Short human name, e.g. "Warm flat editorial". */
+  name: string;
+  /** Bumped whenever a style field changes (see editLook in lib/look.ts). */
+  version: number;
+  /** All colours are #rrggbb. */
+  palette: { bg: string; ink: string; accent: string; muted: string; extra: string[] };
+  typography: { title: FontKind; body: FontKind };
+  /** One or two sentences: medium, line, texture, lighting, level of detail. */
+  illustration: string;
+  motion: { pace: "calm" | "brisk" | "snappy"; notes: string };
+  /** One of CODE_THEMES in lib/look.ts. Applied at render time; never needs a restyle. */
+  codeTheme: string;
+  /** 2–5 mood words. */
+  mood: string[];
+  /** An image whose STYLE (not content) later images should match. */
+  referenceUrl?: string;
+}
+
+/** Which look a generated block was made with. null = deliberately made without the post look. */
+export type LookStamp = { id: string; version: number } | null;
+
+/** What a Remotion composition receives as its `theme` prop. */
+export interface MotionTheme {
+  bg: string;
+  ink: string;
+  accent: string;
+  muted: string;
+  extra: string[];
+  titleFont: string; // CSS font-family stack
+  bodyFont: string;
+  monoFont: string;
 }
 
 export interface RepoData {
@@ -148,6 +195,8 @@ export interface ImageData {
   /** The full prompt that produced this version (so it can be refined/regenerated). */
   prompt: string;
   aspect: Aspect;
+  /** undefined = made before looks existed. */
+  look?: LookStamp;
 }
 
 export interface MotionConfig {
@@ -175,6 +224,8 @@ export interface MotionData {
   height: number;
   alt: string;
   caption?: string;
+  /** undefined = made before looks existed. For mode "code" the stamp describes the rendered asset at `url`. */
+  look?: LookStamp;
 }
 
 export type Verdict = "supported" | "partly" | "disputed" | "unsupported" | "unclear";

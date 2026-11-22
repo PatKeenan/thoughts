@@ -9,7 +9,7 @@ export interface Store {
   createPost(): Promise<Post>;
   updatePost(
     id: string,
-    patch: Partial<Pick<Post, "title" | "slug" | "excerpt" | "content" | "status" | "publishAt">>,
+    patch: Partial<Pick<Post, "title" | "slug" | "excerpt" | "content" | "status" | "publishAt" | "look">>,
   ): Promise<Post | null>;
   deletePost(id: string): Promise<void>;
   /** True if another post (id !== exceptId) already uses this slug. */
