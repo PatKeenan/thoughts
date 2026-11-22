@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# generated motion preview frame
+/public/motion-frame.*
+/.remotion/
+
 # local dev data
 /.data/
 

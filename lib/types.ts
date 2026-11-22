@@ -136,3 +136,65 @@ export interface BuddyResult {
   /** High-level observations (structure mode mostly). Plain sentences. */
   notes: string[];
 }
+
+// ---- Phase 2: image, motion, fact-check -------------------------------------
+
+export type Aspect = "16:9" | "1:1" | "4:5" | "3:2";
+
+export interface ImageData {
+  url: string; // stored media URL
+  alt: string;
+  caption?: string;
+  /** The full prompt that produced this version (so it can be refined/regenerated). */
+  prompt: string;
+  aspect: Aspect;
+}
+
+export interface MotionConfig {
+  durationInFrames: number;
+  fps: number;
+  width: number;
+  height: number;
+}
+
+/** How a motion block is shown in the post. */
+export type MotionOutput = "loop" | "gif" | "video";
+
+export interface MotionData {
+  /** "code" = Remotion composition written by the AI; "clip" = AI video model. */
+  mode: "code" | "clip";
+  /** mode "code": the TSX module (see PHASE2.md "Motion code contract"). */
+  code?: string;
+  config?: MotionConfig;
+  /** mode "clip": the prompt sent to the video model. */
+  prompt?: string;
+  output: MotionOutput; // "gif" is only valid with mode "code"
+  /** Rendered asset (mp4 or gif). Empty string until rendered — unrendered blocks are not shown on the site. */
+  url: string;
+  width: number;
+  height: number;
+  alt: string;
+  caption?: string;
+}
+
+export type Verdict = "supported" | "partly" | "disputed" | "unsupported" | "unclear";
+
+export interface FactSource {
+  title: string;
+  url: string;
+}
+
+export interface FactCheckResult {
+  verdict: Verdict;
+  /** Two or three plain sentences: what the evidence says. */
+  summary: string;
+  /** A corrected version of the claim in the author's wording, only when the claim is wrong or imprecise. */
+  correction?: string;
+  sources: FactSource[];
+}
+
+/** Server-sent progress for renders and clip generation: one JSON object per line (NDJSON). */
+export type JobEvent =
+  | { type: "progress"; label: string; progress: number } // progress 0..1
+  | { type: "done"; url: string; width: number; height: number }
+  | { type: "error"; message: string };

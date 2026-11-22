@@ -14,22 +14,33 @@
     "@fontsource-variable/newsreader": "^5.3.0",
     "@fontsource/instrument-serif": "^5.3.0",
     "@neondatabase/serverless": "^1.2.1",
+    "@remotion/player": "4.0.545",
+    "@remotion/vercel": "4.0.545",
     "@tiptap/extensions": "^3.35.0",
     "@tiptap/pm": "^3.35.0",
     "@tiptap/react": "^3.35.0",
     "@tiptap/starter-kit": "^3.35.0",
     "@tiptap/suggestion": "^3.35.0",
+    "@vercel/blob": "2.9.0",
+    "@vercel/functions": "3.11.3",
+    "@vercel/sandbox": "4.1.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "shiki": "^4.6.0"
+    "remotion": "4.0.545",
+    "shiki": "^4.6.0",
+    "sucrase": "3.35.1"
   },
   "devDependencies": {
+    "@remotion/bundler": "4.0.545",
+    "@remotion/renderer": "4.0.545",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "tsx": "4.23.15",
     "typescript": "^5"
   }
 }
