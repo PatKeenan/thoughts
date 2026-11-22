@@ -3,15 +3,25 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import type { CodeData, GenBlockAttrs } from "@/lib/types";
 import {
-  commitResult,
   contextLabel,
   currentVersion,
+  errorMessage,
+  generateClip,
+  generateImage,
   hasCompleteArtifact,
   initStudio,
+  isAbort,
+  isBusy,
+  planCommit,
+  previewError,
+  renderMotion,
+  requestKindOf,
   streamStudio,
   streamingArtifact,
   studioReducer,
+  type RequestKind,
   type StudioAction,
+  type StudioMode,
   type StudioState,
 } from "@/lib/client/studio";
 import { extractArtifact } from "@/lib/studio/parse";
@@ -20,11 +30,13 @@ import RepoView from "@/components/editor/RepoView";
 import { LANGUAGES, normalizeLang } from "@/components/editor/highlight";
 import { useCoarsePointer, useViewport } from "@/components/editor/useViewport";
 import GithubPicker from "./GithubPicker";
+import { MediaBody, RenderBand } from "./Media";
+import { HandEditor, Stepper, useElapsed, type Part } from "./parts";
 import styles from "./Studio.module.css";
 
 export interface StudioOpen {
   key: number;
-  mode: "code" | "github";
+  mode: StudioMode;
   target: { type: "new"; pos: number } | { type: "existing"; id: string; pos: number };
   existing?: GenBlockAttrs;
   /** Re-run the last user request immediately (block footer "Regenerate"). */
@@ -45,13 +57,35 @@ function init(open: StudioOpen): StudioState {
   return open.regenerate ? studioReducer(s, { type: "regenerate" }) : s;
 }
 
-const QUICK = ["Shorter", "Add comments", "Simplify"];
+const QUICK: Record<RequestKind, string[]> = {
+  code: ["Shorter", "Add comments", "Simplify"],
+  image: ["Simpler", "More contrast", "Different composition"],
+  motion: ["Slower", "Bolder", "Make it loop cleanly"],
+  clip: [],
+};
+
+const TITLE: Record<StudioMode, string> = {
+  code: "Code snippet",
+  github: "GitHub",
+  image: "Image",
+  motion: "Motion graphic",
+};
+
+const DISCARD: Record<StudioMode, string> = {
+  code: "Discard this snippet?",
+  github: "Discard this snippet?",
+  image: "Discard this image?",
+  motion: "Discard this motion graphic?",
+};
 
 export default function Studio({ open, onClose, onCommit, getPostContext }: StudioProps) {
   const [s, dispatch] = useReducer(studioReducer, open, init);
   const vp = useViewport();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const altRef = useRef<HTMLTextAreaElement>(null);
+  const committedRender = useRef<number | null>(null);
   const editing = open.target.type === "existing";
+  const media = s.mode === "image" || s.mode === "motion";
 
   // Lock the page underneath.
   useEffect(() => {
@@ -65,50 +99,119 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
     };
   }, []);
 
-  // Run the in-flight request (one effect per request object).
+  // Run the in-flight request (one effect per request object). Unmount aborts it.
   const req = s.request;
   useEffect(() => {
     if (!req) return;
     const ctrl = new AbortController();
-    streamStudio(
-      {
-        kind: "code",
-        messages: req.messages,
-        current: req.current,
-        context: req.context.length ? { files: req.context } : undefined,
-        post: getPostContext(),
-      },
-      { signal: ctrl.signal, onText: (text) => dispatch({ type: "stream", id: req.id, text }) },
-    )
-      .then((text) => dispatch({ type: "done", id: req.id, text }))
-      .catch((e: unknown) => {
-        if (ctrl.signal.aborted) return;
-        const msg = e instanceof Error && e.message && e.name !== "TypeError" ? e.message : "Network error. Check your connection.";
-        dispatch({ type: "fail", id: req.id, error: msg });
-      });
+    const fail = (e: unknown) => {
+      if (ctrl.signal.aborted || isAbort(e)) return;
+      dispatch({ type: "fail", id: req.id, error: errorMessage(e) });
+    };
+    if (req.kind === "image") {
+      generateImage(
+        { messages: req.messages, current: req.image, aspect: req.aspect ?? "16:9", post: getPostContext() },
+        ctrl.signal,
+      )
+        .then((r) => dispatch({ type: "imageDone", id: req.id, image: r.image, note: r.note }))
+        .catch(fail);
+    } else if (req.kind === "clip") {
+      generateClip(
+        { prompt: req.prompt ?? "", aspect: req.aspect ?? "16:9", seconds: req.seconds ?? 6 },
+        (ev) => {
+          if (ev.type === "progress") dispatch({ type: "progress", id: req.id, label: ev.label, progress: ev.progress });
+        },
+        ctrl.signal,
+      )
+        .then((d) => dispatch({ type: "clipDone", id: req.id, url: d.url, width: d.width, height: d.height }))
+        .catch(fail);
+    } else {
+      streamStudio(
+        {
+          kind: req.kind,
+          messages: req.messages,
+          current: req.kind === "code" ? req.current : req.code !== undefined ? { code: req.code } : undefined,
+          context: req.kind === "code" && req.context.length ? { files: req.context } : undefined,
+          post: getPostContext(),
+        },
+        { signal: ctrl.signal, onText: (text) => dispatch({ type: "stream", id: req.id, text }) },
+      )
+        .then((text) => dispatch({ type: "done", id: req.id, text }))
+        .catch(fail);
+    }
     return () => ctrl.abort();
   }, [req, getPostContext]);
 
-  // Keep the newest turn in view.
+  // Render an animation for "Add inline" (one effect per job; progress lives elsewhere in state).
+  const job = s.render?.phase === "running" ? s.render : null;
+  useEffect(() => {
+    if (!job) return;
+    const ctrl = new AbortController();
+    renderMotion(
+      { code: job.code, output: job.output },
+      (ev) => {
+        if (ev.type === "progress") dispatch({ type: "renderProgress", id: job.id, label: ev.label, progress: ev.progress });
+      },
+      ctrl.signal,
+    )
+      .then((d) => dispatch({ type: "renderDone", id: job.id, url: d.url, width: d.width, height: d.height }))
+      .catch((e: unknown) => {
+        if (ctrl.signal.aborted || isAbort(e)) return;
+        dispatch({ type: "renderFail", id: job.id, message: errorMessage(e) });
+      });
+    return () => ctrl.abort();
+  }, [job]);
+
+  // A finished render commits straight away.
+  useEffect(() => {
+    const r = s.render;
+    if (!r || r.phase !== "done" || committedRender.current === r.id) return;
+    const plan = planCommit(s);
+    if (plan.type === "commit") {
+      committedRender.current = r.id;
+      onCommit(plan.result);
+    } else if (plan.type === "blocked" && plan.reason === "alt") {
+      committedRender.current = r.id;
+      dispatch({ type: "requireAlt" });
+      altRef.current?.focus();
+    }
+  }, [s, onCommit]);
+
+  const elapsed = useElapsed(req && req.kind === "image" ? req.id : null);
+
+  // Keep the newest turn in view. Media modes keep the preview (top) in view instead,
+  // except for errors and the preview's "Fix it", which sit at the end of the thread.
   const threadLen = s.thread.length;
+  const perr = s.request ? null : previewError(s);
   useEffect(() => {
     const el = scrollRef.current;
-    if (el && threadLen > 0) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [threadLen, s.error]);
+    if (!el || (threadLen === 0 && !perr)) return;
+    if (media && !s.error && !perr) el.scrollTo({ top: 0, behavior: "smooth" });
+    else el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [threadLen, s.error, perr, media]);
 
   const cancel = () => {
-    if ((s.dirty || s.request) && !window.confirm("Discard this snippet?")) return;
+    if ((s.dirty || isBusy(s)) && !window.confirm(DISCARD[s.mode])) return;
     onClose();
   };
 
-  const commit = () => {
-    const r = commitResult(s);
-    if (r) onCommit(r);
+  const commit = (skipRender = false) => {
+    const plan = planCommit(s, { skipRender });
+    if (plan.type === "commit") onCommit(plan.result);
+    else if (plan.type === "render") dispatch({ type: "renderStart" });
+    else if (plan.reason === "alt") {
+      dispatch({ type: "requireAlt" });
+      const el = altRef.current;
+      if (el) {
+        el.focus({ preventScroll: true });
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }
   };
 
-  const canCommit = !s.request && hasCompleteArtifact(s);
+  const canCommit = !isBusy(s) && hasCompleteArtifact(s);
   const cur = currentVersion(s);
-  const title = cur?.kind === "repo" || (s.mode === "github" && !cur) ? "GitHub" : "Code snippet";
+  const title = media ? TITLE[s.mode] : cur?.kind === "repo" || (s.mode === "github" && !cur) ? "GitHub" : "Code snippet";
 
   const rootStyle: React.CSSProperties = vp.height ? { top: vp.offsetTop, height: vp.height } : {};
 
@@ -119,10 +222,11 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
           Cancel
         </button>
         <h2 className={styles.title}>{title}</h2>
-        <button type="button" className={styles.commit} onClick={commit} disabled={!canCommit}>
-          {editing ? "Update" : "Add inline"}
+        <button type="button" className={styles.commit} onClick={() => commit()} disabled={!canCommit}>
+          {s.render?.phase === "running" ? "Rendering" : editing ? "Update" : "Add inline"}
         </button>
       </header>
+      {media && <RenderBand s={s} dispatch={dispatch} onRetry={() => commit()} onSkip={() => commit(true)} />}
 
       {s.view === "github" ? (
         <GithubPicker
@@ -135,9 +239,13 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
       ) : (
         <>
           <div className={styles.scroll} ref={scrollRef}>
-            <Preview s={s} dispatch={dispatch} />
-            <Thread s={s} dispatch={dispatch} />
-            {cur?.kind !== "repo" && <ContextChips s={s} dispatch={dispatch} />}
+            {media ? (
+              <MediaBody s={s} dispatch={dispatch} altRef={altRef} elapsed={elapsed} />
+            ) : (
+              <Preview s={s} dispatch={dispatch} />
+            )}
+            <Thread s={s} dispatch={dispatch} elapsed={elapsed} />
+            {!media && cur?.kind !== "repo" && <ContextChips s={s} dispatch={dispatch} />}
           </div>
           {cur?.kind !== "repo" && <Composer s={s} dispatch={dispatch} />}
         </>
@@ -146,7 +254,6 @@ export default function Studio({ open, onClose, onCommit, getPostContext }: Stud
   );
 }
 
-type Part = { s: StudioState; dispatch: React.Dispatch<StudioAction> };
 
 // ---- preview -------------------------------------------------------------------
 
@@ -181,7 +288,7 @@ function Preview({ s, dispatch }: Part) {
     );
   }
 
-  const data: CodeData | null = cur ? cur.data : s.handEdit ? { language: "text", code: "" } : null;
+  const data: CodeData | null = cur?.kind === "code" ? cur.data : s.handEdit ? { language: "text", code: "" } : null;
   if (!data) {
     return (
       <section className={styles.preview}>
@@ -249,31 +356,7 @@ function Preview({ s, dispatch }: Part) {
         >
           {s.handEdit ? "Done editing" : "Edit by hand"}
         </button>
-        {s.versions.length > 1 && (
-          <div className={styles.stepper}>
-            <button
-              type="button"
-              className={styles.stepBtn}
-              aria-label="Previous version"
-              disabled={s.index <= 0 || !!s.request}
-              onClick={() => dispatch({ type: "step", delta: -1 })}
-            >
-              &lsaquo;
-            </button>
-            <span className={styles.stepLabel}>
-              v{s.index + 1} of {s.versions.length}
-            </span>
-            <button
-              type="button"
-              className={styles.stepBtn}
-              aria-label="Next version"
-              disabled={s.index >= s.versions.length - 1 || !!s.request}
-              onClick={() => dispatch({ type: "step", delta: 1 })}
-            >
-              &rsaquo;
-            </button>
-          </div>
-        )}
+        <Stepper s={s} dispatch={dispatch} />
       </div>
     </section>
   );
@@ -325,39 +408,20 @@ function FilenameField({ data, dispatch }: { data: CodeData; dispatch: React.Dis
   );
 }
 
-function HandEditor({ code, dispatch }: { code: string; dispatch: React.Dispatch<StudioAction> }) {
-  return (
-    <textarea
-      className={styles.hand}
-      value={code}
-      autoFocus
-      autoCapitalize="off"
-      autoCorrect="off"
-      spellCheck={false}
-      wrap="off"
-      placeholder="Paste or type code"
-      aria-label="Code"
-      onChange={(e) => dispatch({ type: "handText", code: e.target.value })}
-      onKeyDown={(e) => {
-        // Tab inserts two spaces on desktop instead of leaving the field.
-        if (e.key === "Tab" && !e.shiftKey) {
-          e.preventDefault();
-          const el = e.currentTarget;
-          const { selectionStart: a, selectionEnd: b, value } = el;
-          const next = value.slice(0, a) + "  " + value.slice(b);
-          dispatch({ type: "handText", code: next });
-          requestAnimationFrame(() => el.setSelectionRange(a + 2, a + 2));
-        }
-      }}
-    />
-  );
-}
-
 // ---- thread --------------------------------------------------------------------
 
-function Thread({ s, dispatch }: Part) {
-  const streamingNote = s.request && s.streamText ? (extractArtifact(s.streamText)?.note ?? s.streamText) : "";
-  if (!s.thread.length && !s.request && !s.error) return null;
+function pendingText(s: StudioState, elapsed: number): string {
+  const r = s.request;
+  if (!r) return "";
+  if (r.kind === "image") return `Drawing\u2026 ${elapsed}s`;
+  if (r.kind === "clip") return s.progress?.label ? `${s.progress.label}\u2026` : "Starting\u2026";
+  const note = s.streamText ? (extractArtifact(s.streamText)?.note ?? s.streamText) : "";
+  return note.trim() || "Thinking\u2026";
+}
+
+function Thread({ s, dispatch, elapsed }: Part & { elapsed: number }) {
+  const perr = s.request ? null : previewError(s);
+  if (!s.thread.length && !s.request && !s.error && !perr) return null;
   return (
     <section className={styles.thread} aria-label="Conversation" aria-live="polite">
       {s.thread.map((t, i) => (
@@ -369,7 +433,7 @@ function Thread({ s, dispatch }: Part) {
                 type="button"
                 className={`${styles.chip} ${s.index === t.version ? styles.chipOn : ""}`}
                 onClick={() => dispatch({ type: "go", index: t.version! })}
-                disabled={!!s.request}
+                disabled={isBusy(s)}
                 aria-label={`Show version ${t.version + 1}`}
               >
                 v{t.version + 1}
@@ -382,7 +446,18 @@ function Thread({ s, dispatch }: Part) {
       {s.request && (
         <div className={styles.assistant}>
           <div className={styles.who}>Studio</div>
-          <p className={`${styles.msg} ${styles.pending}`}>{streamingNote.trim() || "Thinking…"}</p>
+          <p className={`${styles.msg} ${styles.pending}`}>{pendingText(s, elapsed)}</p>
+        </div>
+      )}
+      {perr && !s.error && (
+        <div className={styles.errorRow} role="alert">
+          <div className={styles.who}>Preview</div>
+          <p className={styles.msg}>{perr}</p>
+          <div className={styles.errorActions}>
+            <button type="button" className={styles.textBtn} onClick={() => dispatch({ type: "fixIt" })}>
+              Fix it
+            </button>
+          </div>
         </div>
       )}
       {s.error && (
@@ -439,6 +514,18 @@ function Composer({ s, dispatch }: Part) {
   const hasArtifact = hasCompleteArtifact(s);
   const canRegenerate = s.thread.some((t) => t.role === "user");
   const streaming = !!s.request;
+  const rendering = s.render?.phase === "running";
+  const kind = requestKindOf(s);
+  const placeholder =
+    kind === "clip"
+      ? "Describe the clip\u2026"
+      : hasArtifact
+        ? "What should change?"
+        : kind === "image"
+          ? "Describe the image\u2026"
+          : kind === "motion"
+            ? "Describe the animation\u2026"
+            : "Describe the snippet\u2026";
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -448,15 +535,15 @@ function Composer({ s, dispatch }: Part) {
   }, [s.draft]);
 
   const send = (text: string) => {
-    if (!text.trim() || streaming) return;
+    if (!text.trim() || streaming || rendering) return;
     dispatch({ type: "send", text });
   };
 
   return (
     <div className={styles.composer}>
-      {hasArtifact && !streaming && (
+      {hasArtifact && !streaming && !rendering && (
         <div className={styles.quick}>
-          {QUICK.map((q) => (
+          {QUICK[kind].map((q) => (
             <button key={q} type="button" className={styles.quickChip} onPointerDown={(e) => e.preventDefault()} onClick={() => send(q)}>
               {q}
             </button>
@@ -486,7 +573,7 @@ function Composer({ s, dispatch }: Part) {
           className={styles.input}
           rows={1}
           value={s.draft}
-          placeholder={hasArtifact ? "What should change?" : "Describe the snippet…"}
+          placeholder={placeholder}
           aria-label="Message"
           enterKeyHint={coarse ? "enter" : "send"}
           onChange={(e) => dispatch({ type: "draft", text: e.target.value })}
@@ -500,10 +587,10 @@ function Composer({ s, dispatch }: Part) {
         <button
           type="submit"
           className={streaming ? styles.stop : styles.send}
-          disabled={!streaming && !s.draft.trim()}
+          disabled={!streaming && (!s.draft.trim() || rendering)}
           onPointerDown={(e) => e.preventDefault()}
         >
-          {streaming ? "Stop" : "Send"}
+          {streaming ? "Stop" : kind === "clip" ? "Generate" : "Send"}
         </button>
       </form>
     </div>

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import type { CodeData, DocNode, GenBlockAttrs, RepoData } from "@/lib/types";
+import type { CodeData, DocNode, GenBlockAttrs, ImageData, MotionData, RepoData } from "@/lib/types";
 import { CodeFigure } from "./CodeFigure";
+import { ImageFigure } from "./ImageFigure";
+import { MotionFigure } from "./MotionFigure";
 import { RepoCard } from "./RepoCard";
 import styles from "./render.module.css";
 
@@ -113,6 +115,34 @@ function renderNode(node: DocNode, key: number): ReactNode {
               stars: d.stars,
               language: d.language,
               url: d.url,
+            }}
+          />
+        );
+      }
+      if (attrs.kind === "image" && attrs.data) {
+        const d = attrs.data as unknown as ImageData;
+        if (typeof d.url !== "string" || !d.url) return null;
+        return (
+          <ImageFigure
+            key={key}
+            data={{ url: d.url, alt: d.alt, caption: d.caption, prompt: "", aspect: d.aspect }}
+          />
+        );
+      }
+      if (attrs.kind === "motion" && attrs.data) {
+        const d = attrs.data as unknown as MotionData;
+        if (typeof d.url !== "string" || !d.url) return null;
+        return (
+          <MotionFigure
+            key={key}
+            data={{
+              mode: d.mode,
+              output: d.output,
+              url: d.url,
+              width: d.width,
+              height: d.height,
+              alt: d.alt,
+              caption: d.caption,
             }}
           />
         );

@@ -11,6 +11,7 @@ import type { DocNode, GenBlockAttrs, Post } from "@/lib/types";
 import BuddyPanel from "@/components/buddy/BuddyPanel";
 import PublishSheet from "@/components/publish/PublishSheet";
 import Studio, { type StudioOpen, type StudioCommit } from "@/components/studio/Studio";
+import FactCheckSheet from "@/components/factcheck/FactCheckSheet";
 import { GenBlock, type GenOpenRequest } from "./GenBlock";
 import { Handler, SlashCommand, SlashController } from "./slash";
 import SlashMenu from "./SlashMenu";
@@ -101,6 +102,7 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
   const [studio, setStudio] = useState<StudioOpen | null>(null);
   const [buddyOpen, setBuddyOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [factOpen, setFactOpen] = useState(false);
 
   const { state: saveState, schedule, flush } = useAutosave(id, setPost);
 
@@ -146,12 +148,13 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
     openBlock.set((req) => {
       setStudio({
         key: Date.now(),
-        mode: req.attrs.kind === "repo" ? "github" : "code",
+        mode: req.attrs.kind === "repo" ? "github" : req.attrs.kind,
         target: { type: "existing", id: req.attrs.id, pos: req.pos },
         existing: req.attrs,
         regenerate: req.regenerate,
       });
     });
+    controller.fact.set(() => setFactOpen(true));
   }, [controller, openBlock]);
 
   // Auto-grow the title.
@@ -245,7 +248,7 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
         <EditorContent editor={editor} className={styles.body} />
       </main>
 
-      {editor && <Toolbar editor={editor} />}
+      {editor && <Toolbar editor={editor} onCheck={() => setFactOpen(true)} />}
       <SlashMenu controller={controller} />
 
       {editor && studio && (
@@ -265,6 +268,7 @@ function EditorBody({ id, initial }: { id: string; initial: Loaded }) {
 
       {editor && (
         <>
+          <FactCheckSheet open={factOpen} onClose={() => setFactOpen(false)} editor={editor} title={title} />
           <BuddyPanel open={buddyOpen} onClose={() => setBuddyOpen(false)} editor={editor} title={title} />
           <PublishSheet
             open={publishOpen}

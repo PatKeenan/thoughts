@@ -1,6 +1,6 @@
 import { requireAuth } from "@/lib/auth";
 import { chatStream, errorResponse, jsonError, readJson, type ORMessage } from "@/lib/openrouter";
-import { studioContext, truncate, type StudioFile } from "@/lib/prompts";
+import { MOCK_MOTION, motionContext, studioContext, truncate, type StudioFile } from "@/lib/prompts";
 import type { ChatMessage, CodeData } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -8,16 +8,17 @@ export const maxDuration = 60;
 const enc = new TextEncoder();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function mockStream(lastUser: string, current: CodeData | undefined, signal: AbortSignal) {
+function mockStream(lastUser: string, current: CodeData | undefined, signal: AbortSignal, motion = false) {
   const lang = current?.language || "ts";
   const file = current?.filename || "example.ts";
   const echo = lastUser.replace(/\s+/g, " ").slice(0, 120);
-  const text =
-    `Done: ${echo}\n\n` +
-    `\`\`\`${lang} title="${file}"\n` +
-    `export function greet(name: string) {\n  return \`Hello, \${name}\`;\n}\n\n` +
-    `console.log(greet("world"));\n` +
-    `\`\`\`\n`;
+  const text = motion
+    ? `Done: ${echo}\n\n\`\`\`tsx\n${MOCK_MOTION}\`\`\`\n`
+    : `Done: ${echo}\n\n` +
+      `\`\`\`${lang} title="${file}"\n` +
+      `export function greet(name: string) {\n  return \`Hello, \${name}\`;\n}\n\n` +
+      `console.log(greet("world"));\n` +
+      `\`\`\`\n`;
   const chunks = text.match(/[\s\S]{1,12}/g) ?? [];
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -40,7 +41,8 @@ export async function POST(request: Request) {
   if (denied) return denied;
   try {
     const body = await readJson(request);
-    if (body.kind !== "code") return jsonError(400, 'kind must be "code"');
+    const motion = body.kind === "motion";
+    if (body.kind !== "code" && !motion) return jsonError(400, 'kind must be "code" or "motion"');
 
     const raw = Array.isArray(body.messages) ? body.messages : [];
     const messages: ChatMessage[] = raw
@@ -89,12 +91,17 @@ export async function POST(request: Request) {
     };
 
     if (process.env.AI_MOCK === "1") {
-      return new Response(mockStream(messages[messages.length - 1].content, current, request.signal), { headers });
+      return new Response(mockStream(messages[messages.length - 1].content, current, request.signal, motion), { headers });
     }
 
-    const system: ORMessage = { role: "system", content: studioContext({ post, files, current }) };
+    const system: ORMessage = {
+      role: "system",
+      content: motion
+        ? motionContext({ post, current: current && current.code.trim() ? { code: current.code } : undefined })
+        : studioContext({ post, files, current }),
+    };
     const stream = await chatStream({
-      job: "code",
+      job: motion ? "motion" : "code",
       messages: [system, ...messages],
       signal: request.signal,
     });

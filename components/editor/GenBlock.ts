@@ -63,6 +63,10 @@ export const GenBlock = Node.create<GenBlockOptions>({
     const a = node.attrs as GenBlockAttrs;
     if (a.kind === "code") return String((a.data as { code?: string }).code ?? "");
     if (a.kind === "repo") return String((a.data as { fullName?: string }).fullName ?? "");
+    if (a.kind === "image" || a.kind === "motion") {
+      const d = a.data as { alt?: string; caption?: string };
+      return String(d.caption || d.alt || "");
+    }
     return "";
   },
 

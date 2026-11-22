@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run remotion:bundle && npm run build && npm run remotion:snapshot"
+}

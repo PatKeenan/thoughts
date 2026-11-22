@@ -70,10 +70,7 @@ export default function SlashMenu({ controller }: { controller: SlashController 
           onMouseEnter={() => controller.hover(i)}
           onClick={() => controller.choose(i)}
         >
-          <span className={styles.label}>
-            {it.label}
-            {it.disabled && <span className={styles.tag}>next release</span>}
-          </span>
+          <span className={styles.label}>{it.label}</span>
           <span className={styles.hint}>{it.hint}</span>
         </button>
       ))}

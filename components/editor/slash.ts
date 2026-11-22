@@ -3,7 +3,7 @@ import { Extension, type Editor, type Range } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
 import Suggestion, { exitSuggestion, type SuggestionProps, type SuggestionKeyDownProps } from "@tiptap/suggestion";
 
-export type ToolKind = "code" | "github";
+export type ToolKind = "code" | "github" | "image" | "motion";
 
 export interface SlashItem {
   id: string;
@@ -12,6 +12,8 @@ export interface SlashItem {
   keywords: string[];
   disabled?: boolean;
   tool?: ToolKind;
+  /** Non-studio actions handled by the editor screen. */
+  action?: "fact";
   run?: (editor: Editor, range: Range) => void;
 }
 
@@ -24,11 +26,32 @@ export const SLASH_ITEMS: SlashItem[] = [
     tool: "code",
   },
   {
+    id: "image",
+    label: "Image",
+    hint: "Generate an illustration, refine by chat",
+    keywords: ["image", "picture", "illustration", "drawing"],
+    tool: "image",
+  },
+  {
+    id: "motion",
+    label: "Motion graphic",
+    hint: "Animate an idea; loop, GIF or video",
+    keywords: ["motion", "animation", "animate", "video", "gif"],
+    tool: "motion",
+  },
+  {
     id: "github",
     label: "GitHub",
     hint: "Pull code or a repo from GitHub",
     keywords: ["github", "repo", "gh", "git"],
     tool: "github",
+  },
+  {
+    id: "fact",
+    label: "Fact-check",
+    hint: "Check the sentence you're in",
+    keywords: ["fact", "check", "verify", "claim"],
+    action: "fact",
   },
   {
     id: "h2",
@@ -72,9 +95,6 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: ["divider", "rule", "hr", "line"],
     run: (e, r) => e.chain().focus().deleteRange(r).setHorizontalRule().run(),
   },
-  { id: "image", label: "Image", hint: "Generate an image", keywords: ["image", "picture"], disabled: true },
-  { id: "motion", label: "Motion graphic", hint: "Animated figure", keywords: ["motion", "animation"], disabled: true },
-  { id: "fact", label: "Fact-check", hint: "Check claims in the post", keywords: ["fact", "check"], disabled: true },
 ];
 
 export function filterItems(query: string): SlashItem[] {
@@ -122,6 +142,8 @@ export class SlashController {
   state: SlashState = CLOSED;
   /** Set by the editor screen: open the Studio for a tool at a doc position. */
   readonly tool = new Handler<{ tool: ToolKind; pos: number }>();
+  /** Set by the editor screen: open the fact-check sheet for the current selection. */
+  readonly fact = new Handler<void>();
   private listeners = new Set<() => void>();
   private props: SuggestionProps<SlashItem, SlashItem> | null = null;
   private editor: Editor | null = null;
@@ -234,6 +256,13 @@ export const SlashCommand = Extension.create<{ controller: SlashController | nul
           if (item.disabled) return;
           if (item.run) {
             item.run(editor, range);
+            return;
+          }
+          if (item.action === "fact") {
+            // Drop the typed "/query"; the sheet falls back to the sentence around the caret.
+            editor.chain().focus().deleteRange(range).run();
+            editor.commands.blur();
+            controller.fact.call();
             return;
           }
           if (item.tool) {

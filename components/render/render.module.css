@@ -157,3 +157,24 @@
   text-transform: uppercase;
   color: var(--ink-3);
 }
+
+/* Image + motion figures */
+.media {
+  width: 100%;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.mediaFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.motion {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}

@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/build-motion-frame.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/build-motion-frame.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "motion-frame": "node scripts/build-motion-frame.mjs",
+    "remotion:bundle": "tsx scripts/create-snapshot.mts --bundle-only",
+    "remotion:snapshot": "tsx scripts/create-snapshot.mts --skip-bundle"
   },
   "dependencies": {
     "@fontsource-variable/hanken-grotesk": "^5.3.0",
@@ -23,7 +28,7 @@
     "@tiptap/suggestion": "^3.35.0",
     "@vercel/blob": "2.9.0",
     "@vercel/functions": "3.11.3",
-    "@vercel/sandbox": "4.1.0",
+    "@vercel/sandbox": "1.6.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",

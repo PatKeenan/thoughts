@@ -1,0 +1,339 @@
+/* Image and motion modes of the studio. Shares tokens and rhythm with Studio.module.css. */
+
+/* ---- mode switch ------------------------------------------------------------ */
+
+.modeSwitch {
+  display: flex;
+  padding: 0.75rem 1rem 0;
+}
+
+.modeTab {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.modeTab:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.modeTab + .modeTab {
+  border-left: 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.modeOn {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.modeTab:disabled {
+  color: var(--ink-3);
+  border-color: var(--rule);
+  cursor: default;
+}
+
+/* ---- preview frame ------------------------------------------------------------ */
+
+.frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--paper-2);
+}
+
+.skeleton {
+  animation: pulse 1.6s var(--ease) infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+
+.fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dim {
+  opacity: 0.4;
+  transition: opacity 200ms var(--ease);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.overlayText {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.overlayBox {
+  width: min(100%, 18rem);
+  padding: 0.6rem 0.75rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+}
+
+.metaNote {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.actionGroup {
+  display: flex;
+  gap: 1.25rem;
+}
+
+/* ---- pickers ------------------------------------------------------------------ */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0 1rem 0.25rem;
+}
+
+.controls:empty {
+  display: none;
+}
+
+.segRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.segLabel {
+  flex: none;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.seg {
+  display: flex;
+  min-width: 0;
+}
+
+.segBtn {
+  min-width: 48px;
+  min-height: 36px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segBtn + .segBtn {
+  border-left: 0;
+}
+
+.segBtn:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.segBtn:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.segOn {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.segOn + .segBtn {
+  border-left: 0;
+}
+
+.segBtn:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.segBtn.segOn:disabled {
+  background: var(--ink-3);
+  border-color: var(--ink-3);
+  color: var(--paper);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+  text-align: right;
+}
+
+/* ---- fields ------------------------------------------------------------------- */
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem 0.5rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldLabel {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.fieldNote {
+  margin-left: 0.35rem;
+  color: var(--ink-3);
+  text-transform: none;
+  letter-spacing: 0;
+  font-style: italic;
+}
+
+.fieldInput {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.5rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.4;
+  outline: none;
+  caret-color: var(--accent);
+}
+
+.fieldArea {
+  resize: vertical;
+}
+
+.fieldInput:focus {
+  border-bottom-color: var(--ink);
+}
+
+.fieldBad,
+.fieldBad:focus {
+  border-bottom-color: var(--accent);
+}
+
+.fieldError {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--accent);
+}
+
+/* ---- progress ----------------------------------------------------------------- */
+
+.progress {
+  flex: 1;
+  min-width: 0;
+}
+
+.progressText {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.progressLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressPct {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  height: 3px;
+  margin-top: 0.35rem;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 300ms var(--ease);
+}
+
+/* ---- render band (under the header) --------------------------------------------- */
+
+.band {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.35rem 1rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.bandError {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding-top: 0.6rem;
+}
+
+.bandMsg {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.bandActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+}

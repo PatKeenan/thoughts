@@ -77,6 +77,31 @@ export function updateGenBlock(
   return pos;
 }
 
+/**
+ * Merge `patch` into the `data` of the genBlock with this id, wherever it is now
+ * (for async results such as renders; the position may have moved meanwhile).
+ * No-op (returns false) if the block is gone, the editor is destroyed, or
+ * `guard` rejects the block's current data (e.g. its code changed since).
+ * Kept out of undo history so undo never strips a finished render.
+ */
+export function patchGenBlockData(
+  editor: Editor,
+  id: string,
+  patch: Record<string, unknown>,
+  guard?: (data: Record<string, unknown>) => boolean,
+): boolean {
+  if (editor.isDestroyed || !id) return false;
+  const found = findGenBlock(editor.state.doc, id);
+  if (!found) return false;
+  const data = (found.node.attrs.data ?? {}) as Record<string, unknown>;
+  if (guard && !guard(data)) return false;
+  const tr = editor.state.tr
+    .setNodeMarkup(found.pos, undefined, { ...found.node.attrs, data: { ...data, ...patch } })
+    .setMeta("addToHistory", false);
+  editor.view.dispatch(tr);
+  return true;
+}
+
 export function scrollToBlock(editor: Editor, pos: number) {
   const dom = editor.view.nodeDOM(pos);
   if (dom instanceof HTMLElement) dom.scrollIntoView({ block: "center", behavior: "smooth" });

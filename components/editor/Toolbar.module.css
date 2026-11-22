@@ -28,12 +28,29 @@
 
 .inner {
   display: flex;
-  justify-content: space-between;
   max-width: var(--measure);
   margin: 0 auto;
   padding: 0 0.25rem;
+}
+
+.pinned {
+  flex: none;
+  display: flex;
+  border-right: 1px solid var(--rule);
+}
+
+.scroller {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
 }
 
 .btn {
@@ -64,6 +81,14 @@
   font-family: var(--font-mono);
   font-size: 1.15rem;
   color: var(--accent);
+}
+
+.check {
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .text {

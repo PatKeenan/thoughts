@@ -1,6 +1,7 @@
 import type {
   BuddyMode,
   BuddyResult,
+  FactCheckResult,
   Post,
   PostSummary,
   Settings,
@@ -76,6 +77,9 @@ export const api = {
     paragraphs: { i: number; text: string }[];
   }): Promise<BuddyResult> {
     return request<BuddyResult>("/api/ai/buddy", { method: "POST", body });
+  },
+  factcheck(body: { claim: string; context: string; title: string }): Promise<FactCheckResult> {
+    return request<FactCheckResult>("/api/ai/factcheck", { method: "POST", body });
   },
   meta(body: { title: string; text: string }): Promise<{ titles: string[]; excerpt: string; slug: string }> {
     return request("/api/ai/meta", { method: "POST", body });

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated: motion preview frame and Remotion bundle
+    "public/motion-frame.*",
+    ".remotion/**",
   ]),
 ]);
 

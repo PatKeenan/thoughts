@@ -9,7 +9,7 @@ const DEFAULTS: Record<Job, string> = {
   factcheck: "anthropic/claude-sonnet-5.5:online", // ":online" = web search plugin
   image: "google/gemini-3.1-flash-image", // POST /api/v1/images
   motion: "anthropic/claude-sonnet-5.5", // writes Remotion compositions
-  video: "google/veo-3.1", // AI video clips (POST /api/v1/videos); check GET /api/v1/videos/models
+  video: "google/veo-3.1-fast", // AI video clips (POST /api/v1/videos); list: GET /api/v1/videos/models
 };
 
 export function modelFor(job: Job): string {

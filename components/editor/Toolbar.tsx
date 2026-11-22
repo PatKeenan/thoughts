@@ -22,7 +22,27 @@ const icon = (d: string) => (
   </svg>
 );
 
-export default function Toolbar({ editor }: { editor: Editor }) {
+function renderBtn(b: Btn, hidden: boolean) {
+  return (
+    <button
+      key={b.id}
+      type="button"
+      title={b.title}
+      aria-label={b.title}
+      aria-pressed={b.active ?? undefined}
+      disabled={b.disabled}
+      tabIndex={hidden ? -1 : 0}
+      className={`${styles.btn} ${b.active ? styles.active : ""}`}
+      // Keep the editor's selection: the tap must not move focus.
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={b.run}
+    >
+      {b.label}
+    </button>
+  );
+}
+
+export default function Toolbar({ editor, onCheck }: { editor: Editor; onCheck(): void }) {
   const coarse = useCoarsePointer();
   const vp = useViewport();
   const [linkOpen, setLinkOpen] = useState(false);
@@ -67,8 +87,12 @@ export default function Toolbar({ editor }: { editor: Editor }) {
     }
   };
 
-  const buttons: Btn[] = [
+  // Pinned first: the only controls reachable while text is selected on a phone.
+  const pinned: Btn[] = [
     { id: "slash", label: <span className={styles.slash}>/</span>, title: "Insert", run: () => triggerSlash(editor) },
+    { id: "check", label: <span className={styles.check}>Check</span>, title: "Fact-check the selection", run: onCheck },
+  ];
+  const buttons: Btn[] = [
     { id: "bold", label: <b>B</b>, title: "Bold", active: st.bold, run: () => editor.chain().focus().toggleBold().run() },
     { id: "italic", label: <i>I</i>, title: "Italic", active: st.italic, run: () => editor.chain().focus().toggleItalic().run() },
     {
@@ -103,22 +127,8 @@ export default function Toolbar({ editor }: { editor: Editor }) {
         aria-hidden={hidden || undefined}
       >
         <div className={styles.inner}>
-          {buttons.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              title={b.title}
-              aria-label={b.title}
-              aria-pressed={b.active ?? undefined}
-              disabled={b.disabled}
-              tabIndex={hidden ? -1 : 0}
-              className={`${styles.btn} ${b.active ? styles.active : ""}`}
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={b.run}
-            >
-              {b.label}
-            </button>
-          ))}
+          <div className={styles.pinned}>{pinned.map((b) => renderBtn(b, hidden))}</div>
+          <div className={styles.scroller}>{buttons.map((b) => renderBtn(b, hidden))}</div>
         </div>
       </div>
       <Sheet open={linkOpen} onClose={() => setLinkOpen(false)} title="Link">
