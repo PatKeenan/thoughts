@@ -20,20 +20,21 @@ Light only, by choice. A cool off-white page (`--paper`), text in the darkest te
 ## Deploy (Vercel)
 
 1. Import this repo in Vercel.
-2. Storage → add **Neon** Postgres (sets `DATABASE_URL`). Tables are created on first use.
+2. Database and sign-in are Neon (`neon.ts` declares Postgres + Neon Auth; `neon deploy` provisions them and writes `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and `NEON_AUTH_BASE_URL` into `.env`). Copy those to Vercel, or connect Neon under Storage. Tables are created on first use.
 3. Storage → add **Blob** (sets `BLOB_READ_WRITE_TOKEN`). Images, clips and rendered animations are stored there. Redeploy after adding it: the build then saves a render sandbox snapshot so animation renders start fast. Leave Vercel Sandbox / OIDC on (default).
-4. Add env vars from `.env.example`: `ADMIN_PASSWORD`, `SESSION_SECRET`, `OPENROUTER_API_KEY`, optionally `GITHUB_TOKEN`.
-5. Deploy. Open `https://<your-site>/write` on your phone → Share → **Add to Home Screen**.
+4. Add env vars from `.env.example`: `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_EMAIL`, `LOGIN_SLUG`, `OPENROUTER_API_KEY`, optionally `GITHUB_TOKEN`. Add the site's origin as a trusted domain: `neon neon-auth domain add https://<your-site>`.
+5. Deploy. Sign in at `https://<your-site>/<LOGIN_SLUG>` (there is no `/login`; every other path 404s, and `/write` 404s for anyone who isn't signed in on a device you've used before). Then open `/write` on your phone → Share → **Add to Home Screen**. The author account is created once (sign-up is disabled on the Neon branch: `neon neon-auth config email-password update --disable-sign-up`).
 6. In the app: Settings → site title, your name, voice notes.
 
 ## Local
 
 ```bash
-cp .env.example .env.local   # set ADMIN_PASSWORD and SESSION_SECRET; AI_MOCK=1 works without keys
+neon deploy                  # pulls DATABASE_URL and NEON_AUTH_BASE_URL into .env
+# then add NEON_AUTH_COOKIE_SECRET, ADMIN_EMAIL and LOGIN_SLUG (see .env.example); AI_MOCK=1 works without AI keys
 npm install && npm run dev
 ```
 
-Without `DATABASE_URL`, posts are kept in `.data/db.json` (local only).
+Without `DATABASE_URL`, posts are kept in `.data/db.json` (local only). Sign-in always needs Neon Auth (`NEON_AUTH_BASE_URL`); localhost origins are trusted by default.
 
 ## Models
 
@@ -52,4 +53,4 @@ All AI goes through OpenRouter, one model per job, set in `lib/models.ts` and ov
 
 ## Animations
 
-AI-written animation code only ever runs in a sandboxed iframe with no network access (preview) or in the render sandbox. Rendering uses Remotion: locally with your Chrome (`CHROME_PATH`, default `/usr/bin/google-chrome`), on Vercel in a Vercel Sandbox. Remotion is free for individuals; companies of more than three people need a licence (remotion.dev/license).
+AI-written animation code only ever runs in a sandboxed iframe with no network access (preview) or in the render sandbox. Rendering uses Remotion: locally with your installed Chrome (found in the usual place on macOS, Linux and Windows; set `CHROME_PATH` to override), on Vercel in a Vercel Sandbox. Remotion is free for individuals; companies of more than three people need a licence (remotion.dev/license).

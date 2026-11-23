@@ -74,10 +74,10 @@ export default function SettingsPage() {
     try {
       await api.logout();
     } catch {
-      /* go to login regardless */
+      /* leave regardless */
     }
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    location.href = "/login"; // full navigation clears client state
+    location.href = "/"; // full navigation clears client state
   }
 
   return (

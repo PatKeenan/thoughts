@@ -1,4 +1,5 @@
-import { neon } from "@neondatabase/serverless";
+import { attachDatabasePool } from "@vercel/functions";
+import { Pool } from "pg";
 import { randomUUID } from "node:crypto";
 import { DEFAULT_SETTINGS, type DocNode, type Look, type Post, type PostStatus, type PostSummary, type Settings } from "@/lib/types";
 import type { Store } from "./index";
@@ -41,8 +42,18 @@ function toPost(r: Row): Post {
 
 const SUMMARY_COLS = "id, slug, title, excerpt, status, publish_at, look, created_at, updated_at";
 
+/**
+ * node-postgres over Neon's pooled (-pooler) URL. On Vercel Fluid compute the pool is reused
+ * across requests and attachDatabasePool closes idle clients before the instance suspends.
+ */
 export function createPostgresStore(url: string): Store {
-  const sql = neon(url);
+  // pg treats sslmode=require as verify-full anyway and warns about it; say so explicitly.
+  const connectionString = url.replace(/([?&]sslmode=)(prefer|require|verify-ca)\b/, "$1verify-full");
+  const pool = new Pool({ connectionString, max: 5, idleTimeoutMillis: 5000 });
+  attachDatabasePool(pool);
+  const sql = {
+    query: async (text: string, params: unknown[] = []) => (await pool.query(text, params)).rows as Row[],
+  };
   let ready: Promise<void> | null = null;
 
   function init(): Promise<void> {

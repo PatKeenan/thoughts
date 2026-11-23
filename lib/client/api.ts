@@ -7,6 +7,7 @@ import type {
   PostSummary,
   Settings,
 } from "@/lib/types";
+import { getAuthClient } from "@/lib/client/auth";
 
 async function request<T>(
   path: string,
@@ -20,7 +21,7 @@ async function request<T>(
   });
   if (res.status === 401) {
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    location.href = "/login?next=" + encodeURIComponent(location.pathname);
+    location.href = "/write/resume?next=" + encodeURIComponent(location.pathname);
     return new Promise<T>(() => {});
   }
   let data: unknown = null;
@@ -98,6 +99,7 @@ export const api = {
     return request("/api/ai/meta", { method: "POST", body });
   },
   async logout(): Promise<void> {
-    await request<unknown>("/api/auth/logout", { method: "POST", body: {} });
+    const { error } = await (await getAuthClient()).signOut();
+    if (error) throw new Error(error.message || "Could not sign out");
   },
 };

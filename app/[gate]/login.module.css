@@ -74,3 +74,7 @@
   opacity: 0.5;
   cursor: default;
 }
+
+.gap {
+  margin-top: 1rem;
+}

@@ -50,7 +50,7 @@ export interface StudioRequest {
 function redirectToLogin(): Promise<never> {
   // Full navigation on purpose (same as lib/client/api.ts): the session is gone.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-  location.href = "/login?next=" + encodeURIComponent(location.pathname);
+  location.href = "/write/resume?next=" + encodeURIComponent(location.pathname);
   return new Promise<never>(() => {});
 }
 

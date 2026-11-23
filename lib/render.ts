@@ -203,6 +203,31 @@ function enqueue<T>(job: () => Promise<T>, emit: Emit): Promise<T> {
   return run;
 }
 
+/** Usual install locations of Chrome/Chromium per OS; CHROME_PATH wins when set. */
+const CHROME_CANDIDATES: Record<string, string[]> = {
+  darwin: [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    path.join(os.homedir(), "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+  ],
+  linux: ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser"],
+  win32: [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  ],
+};
+
+function findChrome(): string {
+  const fromEnv = process.env.CHROME_PATH;
+  if (fromEnv) {
+    if (!existsSync(fromEnv)) throw new Error(`CHROME_PATH is set to "${fromEnv}", but no file exists there.`);
+    return fromEnv;
+  }
+  const found = (CHROME_CANDIDATES[process.platform] ?? []).find((p) => existsSync(p));
+  if (!found) throw new Error("Could not find Chrome to render with. Install Google Chrome or set CHROME_PATH to its executable.");
+  return found;
+}
+
 export async function renderLocally(
   code: string,
   plan: RenderPlan,
@@ -212,7 +237,7 @@ export async function renderLocally(
   return enqueue(async () => {
     const { renderer, bundler } = await loadLocal();
     const serveUrl = await getLocalBundle(bundler, emit);
-    const browserExecutable = process.env.CHROME_PATH || "/usr/bin/google-chrome";
+    const browserExecutable = findChrome();
     // Full Chrome (not chrome-headless-shell) needs the new headless mode.
     const chromeMode = "chrome-for-testing" as const;
     const inputProps = { code, theme };
