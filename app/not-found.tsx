@@ -30,7 +30,17 @@ export default function NotFound() {
           margin: "0.5rem 0 1rem",
         }}
       >
-        <span style={{ color: "var(--accent)" }}>¶ </span>
+        {/* The margin-note rule from the site icon, standing in front of the heading. */}
+        <span
+          aria-hidden="true"
+          style={{
+            display: "inline-block",
+            width: "0.14em",
+            height: "0.78em",
+            marginRight: "0.32em",
+            background: "var(--accent-2)",
+          }}
+        />
         Nothing here.
       </h1>
       <p style={{ color: "var(--ink-2)" }}>

@@ -9,7 +9,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Blog",
   appleWebApp: { capable: true, title: "Write", statusBarStyle: "default" },
-  icons: { apple: "/apple-touch-icon.png" },
+  // Listing `icons` replaces the link Next would add for app/icon.png, so name the favicon too.
+  icons: { icon: { url: "/icon.png", type: "image/png", sizes: "64x64" }, apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
