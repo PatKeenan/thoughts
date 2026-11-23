@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT = ROOT / "node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff"
+FONT = ROOT / "node_modules/@fontsource/schibsted-grotesk/files/schibsted-grotesk-latin-700-normal.woff"
 PAPER = (245, 248, 247)
 VERMILION = (219, 39, 119)  # pink mark (name kept from the first palette)
 SS = 4  # supersample
@@ -24,8 +24,7 @@ def render(size: int, glyph_frac: float) -> Image.Image:
     l, t, r, b = font.getbbox("¶")
     x = (big - (r - l)) / 2 - l
     y = (big - (b - t)) / 2 - t
-    # Faux-bold: stroke thickens the thin display serif so it holds at small sizes.
-    d.text((x, y), "¶", font=font, fill=VERMILION, stroke_width=round(big * 0.012), stroke_fill=VERMILION)
+    d.text((x, y), "¶", font=font, fill=VERMILION, stroke_width=0)
     return img.resize((size, size), Image.LANCZOS)
 
 

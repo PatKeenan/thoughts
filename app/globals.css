@@ -3,7 +3,8 @@
    off-white page; text in the darkest teal instead of black; teal for structure
    (links, primary actions) and pink for the sparks (marks, selection, pull rules).
    Light only, by choice: the expression lives in the accents and in the code
-   blocks (Dracula), not in a dark developer skin. Hairline rules, no cards or shadows. */
+   blocks (Dracula), not in a dark developer skin. Hairline rules, no cards or shadows.
+   Type: all sans — Schibsted Grotesk for headings and controls, Figtree for reading. */
 :root {
   --paper: #f5f8f7; /* subtle cool off-white */
   --paper-2: #e8efed; /* raised / inset surfaces */
@@ -18,9 +19,13 @@
   --code-bg: #282a36; /* Dracula */
   --code-ink: #f8f8f2;
 
-  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
-  --font-body: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
-  --font-ui: "Hanken Grotesk Variable", system-ui, sans-serif;
+  --font-display: "Schibsted Grotesk Variable", system-ui, sans-serif;
+  --font-body: "Figtree Variable", system-ui, sans-serif;
+  --font-ui: "Schibsted Grotesk Variable", system-ui, sans-serif;
+  /* Headings: one place to tune weight, tracking and optical size. */
+  --display-weight: 700;
+  --display-tracking: -0.035em;
+  --display-scale: 0.82;
   --font-mono: "JetBrains Mono Variable", ui-monospace, Menlo, monospace;
 
   --measure: 38rem;

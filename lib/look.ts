@@ -36,8 +36,8 @@ export const DEFAULT_MOTION_THEME: MotionTheme = {
   accent: "#0f766e",
   muted: "#cddbd8",
   extra: ["#db2777"],
-  titleFont: FONT_STACKS.serif,
-  bodyFont: FONT_STACKS.serif,
+  titleFont: FONT_STACKS.sans,
+  bodyFont: FONT_STACKS.sans,
   monoFont: FONT_STACKS.mono,
 };
 

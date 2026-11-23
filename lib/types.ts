@@ -55,7 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
     name: "House: teal and pink",
     version: 1,
     palette: { bg: "#f5f8f7", ink: "#042f2e", accent: "#0f766e", muted: "#cddbd8", extra: ["#db2777"] },
-    typography: { title: "serif", body: "serif" },
+    typography: { title: "sans", body: "sans" },
     illustration:
       "Clean editorial illustration: flat shapes with a few fine lines, generous empty space, soft even light, no gradients or 3D gloss, no stock-photo look.",
     motion: { pace: "calm", notes: "Unhurried, confident moves; one idea at a time." },

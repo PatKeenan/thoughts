@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource/instrument-serif/400.css";
-import "@fontsource/instrument-serif/400-italic.css";
-import "@fontsource-variable/newsreader";
-import "@fontsource-variable/newsreader/wght-italic.css";
-import "@fontsource-variable/hanken-grotesk";
+import "@fontsource-variable/schibsted-grotesk";
+import "@fontsource-variable/schibsted-grotesk/wght-italic.css";
+import "@fontsource-variable/figtree";
+import "@fontsource-variable/figtree/wght-italic.css";
 import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
 

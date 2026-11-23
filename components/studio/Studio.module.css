@@ -49,8 +49,9 @@
 .title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 1.3rem;
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  font-size: calc(1.3rem * var(--display-scale));
   line-height: 1;
   white-space: nowrap;
 }

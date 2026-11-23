@@ -17,7 +17,9 @@
   display: block;
   margin-top: 0.2rem;
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  font-size: calc(1.6rem * var(--display-scale));
   line-height: 1.15;
   text-decoration: none;
   overflow-wrap: anywhere;

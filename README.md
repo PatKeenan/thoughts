@@ -15,7 +15,7 @@ A personal blog with a phone-first writing app you add to your Home Screen.
 
 ## Design
 
-Light only, by choice. A cool off-white page (`--paper`), text in the darkest teal (`--ink`), teal for links and primary actions (`--accent`), pink for the marks, selection and pull rules (`--accent-2`). Code blocks default to Dracula. All tokens live in `app/globals.css`. New installs start with a built-in "House: teal and pink" look as the site default; each post page takes its two accent colours from its own look.
+Light only, by choice. A cool off-white page (`--paper`), text in the darkest teal (`--ink`), teal for links and primary actions (`--accent`), pink for the marks, selection and pull rules (`--accent-2`). Code blocks default to Dracula. Type is all sans: Schibsted Grotesk for headings and controls, Figtree for reading; heading weight, tracking and scale are the `--display-*` tokens. All tokens live in `app/globals.css`. New installs start with a built-in "House: teal and pink" look as the site default; each post page takes its two accent colours from its own look.
 
 ## Deploy (Vercel)
 
