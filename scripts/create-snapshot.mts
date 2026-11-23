@@ -8,7 +8,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { snapshotBlobKey, VERCEL_BUNDLE_DIR } from "../remotion/constants";
+import { prepareSandboxBundleDir, snapshotBlobKey, VERCEL_BUNDLE_DIR } from "../remotion/constants";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const bundleDir = path.join(root, VERCEL_BUNDLE_DIR);
@@ -45,6 +45,7 @@ async function snapshot() {
     },
   });
   try {
+    await prepareSandboxBundleDir(sandbox);
     await addBundleToSandbox({ sandbox, bundleDir });
     log("taking snapshot…");
     const { snapshotId } = await sandbox.snapshot({ expiration: 0 });

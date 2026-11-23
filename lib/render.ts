@@ -15,7 +15,7 @@ import { DEFAULT_MOTION_THEME } from "@/lib/look";
 import type { JobEvent, MotionConfig, MotionOutput, MotionTheme } from "@/lib/types";
 import { checkMotion } from "@/remotion/check";
 import { sanitizeTheme } from "@/remotion/theme";
-import { COMPOSITION_ID, snapshotBlobKey, VERCEL_BUNDLE_DIR } from "@/remotion/constants";
+import { COMPOSITION_ID, prepareSandboxBundleDir, snapshotBlobKey, VERCEL_BUNDLE_DIR } from "@/remotion/constants";
 
 export type Emit = (e: JobEvent) => void;
 export interface RenderResult {
@@ -331,6 +331,7 @@ async function renderOnVercel(code: string, plan: RenderPlan, emit: Emit, theme:
       onProgress: ({ progress }) =>
         emit({ type: "progress", label: "Preparing renderer (first run)", progress: 0.02 + progress * 0.25 }),
     });
+    await prepareSandboxBundleDir(sandbox);
     await v.addBundleToSandbox({ sandbox, bundleDir });
   }
 
