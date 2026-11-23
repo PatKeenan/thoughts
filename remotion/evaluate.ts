@@ -1,4 +1,4 @@
-// Executes AI-written motion code (see PHASE2.md "Motion code contract").
+// Executes AI-written motion code (see CLAUDE.md "Animations").
 // Shared by the preview frame (browser) and the Remotion bundle (headless
 // Chrome); also runs in Node for tests. Only "react" and "remotion" can be
 // required. The config comes from the static extractor so preview, server

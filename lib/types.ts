@@ -223,7 +223,7 @@ export type MotionOutput = "loop" | "gif" | "video";
 export interface MotionData {
   /** "code" = Remotion composition written by the AI; "clip" = AI video model. */
   mode: "code" | "clip";
-  /** mode "code": the TSX module (see PHASE2.md "Motion code contract"). */
+  /** mode "code": the TSX module (see CLAUDE.md "Animations"). */
   code?: string;
   config?: MotionConfig;
   /** mode "clip": the prompt sent to the video model. */

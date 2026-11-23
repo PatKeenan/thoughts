@@ -1,4 +1,4 @@
-// Renders motion code (PHASE2.md "Remotion pipeline") to MP4/GIF.
+// Renders motion code (docs/build-notes/PHASE2.md "Remotion pipeline") to MP4/GIF.
 // Two backends:
 //  - local: @remotion/bundler + @remotion/renderer with the system Chrome.
 //    Imported with webpackIgnore/turbopackIgnore so they never enter the
