@@ -1,22 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getStore } from "@/lib/store";
+import { RSS_ALTERNATE, siteOgImage, siteOrigin } from "@/lib/site";
 import styles from "./site.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await (await getStore()).getSettings();
-  let metadataBase: URL | undefined;
-  try {
-    if (s.siteUrl) metadataBase = new URL(s.siteUrl);
-  } catch {
-    metadataBase = undefined;
-  }
+  const origin = siteOrigin(s);
   return {
-    metadataBase,
+    metadataBase: origin ? new URL(origin) : undefined,
     title: { default: s.siteTitle, template: `%s — ${s.siteTitle}` },
-    description: s.tagline,
-    alternates: { types: { "application/rss+xml": "/feed.xml" } },
-    openGraph: { siteName: s.siteTitle, type: "website" },
+    description: s.tagline || undefined,
+    authors: s.author ? [{ name: s.author, url: origin ?? undefined }] : undefined,
+    alternates: { types: RSS_ALTERNATE },
+    openGraph: { siteName: s.siteTitle, type: "website", locale: "en_US", images: [siteOgImage()] },
+    twitter: { card: "summary_large_image", images: [siteOgImage()] },
   };
 }
 

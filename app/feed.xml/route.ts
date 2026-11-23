@@ -1,4 +1,5 @@
 import { getStore } from "@/lib/store";
+import { siteOrigin } from "@/lib/site";
 
 export const revalidate = 60;
 
@@ -16,7 +17,7 @@ function esc(s: string): string {
 export async function GET(request: Request) {
   const store = await getStore();
   const [settings, all] = await Promise.all([store.getSettings(), store.listPublic()]);
-  const origin = (settings.siteUrl || new URL(request.url).origin).replace(/\/+$/, "");
+  const origin = siteOrigin(settings) ?? new URL(request.url).origin;
   const posts = all.slice(0, 30);
   const items = posts
     .map((p) => {

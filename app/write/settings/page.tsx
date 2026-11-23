@@ -127,6 +127,10 @@ export default function SettingsPage() {
               value={s.siteUrl}
               onChange={(e) => set("siteUrl", e.target.value)}
             />
+            <span className={styles.help}>
+              The address search engines, link previews, the sitemap and RSS use for every page. Set it to your real
+              domain once it is live; until then the Vercel production address is used.
+            </span>
           </label>
           <label className={styles.field}>
             <span className={styles.label}>Voice notes</span>

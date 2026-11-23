@@ -244,7 +244,11 @@ function Form({
       <label className={styles.field}>
         <span className={styles.label}>Excerpt</span>
         <textarea rows={3} value={excerpt} onChange={(e) => setExcerpt(e.target.value)} />
-        <span className={styles.help}>{excerpt.length} characters, around 160 works well.</span>
+        <span className={styles.help}>
+          {excerpt.trim()
+            ? `${excerpt.length} characters, around 160 works well. Shown in search results and link previews.`
+            : "Shown in search results and link previews. Left empty, the post's opening lines are used."}
+        </span>
       </label>
 
       <div>

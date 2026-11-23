@@ -8,7 +8,12 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "*.local"],
   // The render route falls back to building a sandbox from the Remotion bundle
   // when no build-time snapshot exists, so the bundle must ship with the function.
-  outputFileTracingIncludes: { "/api/render": ["./.remotion/**/*"] },
+  // The link-preview cards (lib/og.tsx) read their fonts from assets/fonts at runtime.
+  outputFileTracingIncludes: {
+    "/api/render": ["./.remotion/**/*"],
+    "/og": ["./assets/fonts/**/*"],
+    "/og/posts/[slug]": ["./assets/fonts/**/*"],
+  },
   serverExternalPackages: ["@remotion/vercel", "@remotion/renderer", "@remotion/bundler"],
 };
 

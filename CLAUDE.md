@@ -20,7 +20,7 @@ There is no test suite in the repo. The app was verified with throwaway Playwrig
 
 ## Layout
 
-- `app/(site)/**` — public blog: `/`, `/posts/[slug]`; `app/feed.xml` — RSS. Both pages are `force-dynamic` so scheduled posts go live on time and builds need no database.
+- `app/(site)/**` — public blog: `/`, `/posts/[slug]`; `app/feed.xml` — RSS. SEO: `app/robots.ts`, `app/sitemap.ts`, link-preview cards at `/og` and `/og/posts/<slug>` (`lib/og.tsx`, fonts in `assets/fonts`), `BlogPosting` JSON-LD on posts. Absolute URLs come from `siteOrigin()` in `lib/site.ts` (Settings → Site URL, else Vercel's production domain); a page that sets `alternates` must repeat `RSS_ALTERNATE`. Both pages are `force-dynamic` so scheduled posts go live on time and builds need no database.
 - `app/write/**` — the editor app (auth-guarded in `app/write/layout.tsx`): drafts list, `/write/[id]` editor, settings; `/write/resume` sends a 401'd editor back to sign-in.
 - `app/[gate]` — the sign-in page, served only at `/<LOGIN_SLUG>`; any other unclaimed single-segment path 404s through it.
 - `app/api/**` — every handler except `auth/[...path]` starts with `requireAuth()` from `lib/auth.ts`.
