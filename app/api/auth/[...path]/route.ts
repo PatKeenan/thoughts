@@ -1,11 +1,11 @@
-import { deviceCookieHeader, getAuth, loginSlug } from "@/lib/auth";
+import { deviceCookieHeader, getAuth, isAdminEmail, loginSlug } from "@/lib/auth";
 
 /**
  * Proxies the browser auth client to Neon Auth, but only the few calls this one-author app uses.
  * - POST sign-in/email: only from the secret sign-in page (checked by its same-origin Referer),
  *   so bots posting straight at the usual Better Auth path get a 404 like any unknown URL.
  * - POST sign-out.
- * - GET (session reads).
+ * - GET get-session (the only read this app makes).
  * Everything else, including sign-up and password reset, is a 404. Sign-up is also disabled on
  * the Neon branch, which covers requests sent to Neon Auth directly.
  */
@@ -37,7 +37,9 @@ function fromLoginPage(req: Request): boolean {
 
 export async function GET(req: Request, ctx: Ctx) {
   const h = handler();
-  return h ? h.GET(req, ctx) : notFound();
+  if (!h) return notFound();
+  const path = (await ctx.params).path.join("/");
+  return path === "get-session" ? h.GET(req, ctx) : notFound();
 }
 
 export async function POST(req: Request, ctx: Ctx) {
@@ -50,7 +52,9 @@ export async function POST(req: Request, ctx: Ctx) {
   if (path === "sign-in/email" && fromLoginPage(req)) {
     const res = await h.POST(req, ctx);
     const device = deviceCookieHeader();
-    if (res.ok && device) {
+    // Mark the device only for the author: a valid non-author account learns nothing extra.
+    const email = res.ok ? ((await res.clone().json().catch(() => null)) as { user?: { email?: unknown } } | null)?.user?.email : null;
+    if (res.ok && device && isAdminEmail(email)) {
       const out = new Response(res.body, res);
       out.headers.append("Set-Cookie", device);
       return out;

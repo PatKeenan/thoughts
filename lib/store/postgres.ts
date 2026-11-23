@@ -47,9 +47,16 @@ const SUMMARY_COLS = "id, slug, title, excerpt, status, publish_at, look, create
  * across requests and attachDatabasePool closes idle clients before the instance suspends.
  */
 export function createPostgresStore(url: string): Store {
-  // pg treats sslmode=require as verify-full anyway and warns about it; say so explicitly.
-  const connectionString = url.replace(/([?&]sslmode=)(prefer|require|verify-ca)\b/, "$1verify-full");
-  const pool = new Pool({ connectionString, max: 5, idleTimeoutMillis: 5000 });
+  // TLS with certificate verification, always: the URL's own sslmode (which could say
+  // `disable` or `no-verify`) is dropped so it can't override the explicit `ssl` option.
+  const u = new URL(url);
+  u.searchParams.delete("sslmode");
+  const pool = new Pool({
+    connectionString: u.toString(),
+    ssl: { rejectUnauthorized: true },
+    max: 5,
+    idleTimeoutMillis: 5000,
+  });
   attachDatabasePool(pool);
   const sql = {
     query: async (text: string, params: unknown[] = []) => (await pool.query(text, params)).rows as Row[],
