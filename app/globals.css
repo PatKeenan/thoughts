@@ -28,7 +28,7 @@
   --display-scale: 0.82;
   --font-mono: "JetBrains Mono Variable", ui-monospace, Menlo, monospace;
 
-  --measure: 38rem;
+  --measure: 40rem;
   --radius: 3px;
   --tap: 44px; /* minimum touch target */
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);

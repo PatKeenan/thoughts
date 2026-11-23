@@ -90,7 +90,9 @@ export default async function PostPage({ params }: Props) {
       </Link>
       <h1 className={styles.postTitle}>{post.title}</h1>
       <p className={`${styles.meta} ${styles.label}`}>
-        <time dateTime={when}>{formatDate(when)}</time> · {readingMinutes(post.content)} min read
+        <time dateTime={when}>{formatDate(when)}</time>
+        <span className={styles.metaSep}> · </span>
+        <span>{readingMinutes(post.content)} min read</span>
       </p>
       <Doc doc={post.content} look={look} />
     </article>

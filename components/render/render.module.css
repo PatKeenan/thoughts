@@ -1,11 +1,14 @@
+/* Text keeps the reading measure; figures (code, images, animations) may use the full column. */
 .doc {
-  max-width: var(--measure);
   font-size: 1.1875rem;
   line-height: 1.65;
   overflow-wrap: break-word;
 }
 .doc > * {
   margin: 0 0 1.15em;
+}
+.doc > :not(.figure) {
+  max-width: var(--measure);
 }
 .doc p {
   margin-top: 0;
